@@ -17,12 +17,12 @@ export interface RegisterPayload {
 export async function register(payload: RegisterPayload): Promise<{ user: User | null; error: string | null }> {
   const { email, password, pseudo, primaryLanguage, secondaryLanguages } = payload
 
-  // 1. Créer le compte Auth Supabase
+  // 1. Créer le compte Auth Supabase (le trigger handle_new_user crée le profil automatiquement)
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      data: { pseudo },
+      data: { pseudo, primary_language: primaryLanguage },
     },
   })
 
@@ -30,35 +30,25 @@ export async function register(payload: RegisterPayload): Promise<{ user: User |
     return { user: null, error: authError?.message ?? 'Erreur lors de la création du compte.' }
   }
 
-  // 2. Insérer le profil utilisateur dans la table `users`
+  // 2. Mettre à jour les secondary_languages (le trigger ne les gère pas)
+  if (secondaryLanguages.length > 0) {
+    await supabase
+      .from('profiles')
+      .update({ secondary_languages: secondaryLanguages })
+      .eq('id', authData.user.id)
+  }
+
+  // 3. Récupérer le profil créé par le trigger
   const { data: userData, error: userError } = await supabase
-    .from('users')
-    .insert({
-      id: authData.user.id,
-      email,
-      pseudo,
-      coins: 500, // Coins de départ
-      primary_language: primaryLanguage,
-      secondary_languages: secondaryLanguages,
-      avatar_url: null,
-      created_at: new Date().toISOString(),
-    })
-    .select()
+    .from('profiles')
+    .select('*')
+    .eq('id', authData.user.id)
     .single()
 
   if (userError) {
-    console.error('[authHelpers] register - insert user:', userError.message)
-    return { user: null, error: 'Erreur lors de la création du profil.' }
+    console.error('[authHelpers] register - fetch profile:', userError.message)
+    return { user: null, error: 'Erreur lors de la récupération du profil.' }
   }
-
-  // 3. Initialiser les stats de match dans `user_profiles`
-  await supabase.from('user_profiles').insert({
-    id: authData.user.id,
-    total_matches: 0,
-    wins: 0,
-    losses: 0,
-    rank: 0,
-  })
 
   return { user: userData as User, error: null }
 }
@@ -77,15 +67,13 @@ export async function login(
   }
 
   if (rememberMe) {
-    // Supabase gère la persistance via localStorage par défaut avec persistSession: true
-    // On stocke un flag pour l'UX
     localStorage.setItem('psg_remember_me', '1')
   } else {
     localStorage.removeItem('psg_remember_me')
   }
 
   const { data: userData, error: userError } = await supabase
-    .from('users')
+    .from('profiles')
     .select('*')
     .eq('id', data.user.id)
     .single()
@@ -119,7 +107,7 @@ export async function getCurrentUser(): Promise<User | null> {
   if (!data.user) return null
 
   const { data: userData, error } = await supabase
-    .from('users')
+    .from('profiles')
     .select('*')
     .eq('id', data.user.id)
     .single()
