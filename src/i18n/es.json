@@ -1,0 +1,98 @@
+{
+  "nav": {
+    "chat": "Chat",
+    "packs": "Sobres",
+    "collection": "Colección",
+    "equipe": "Equipo",
+    "match": "Partido",
+    "histoire": "Historia",
+    "config": "Ajustes"
+  },
+  "auth": {
+    "login": "Iniciar sesión",
+    "register": "Registrarse",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "pseudo": "Nombre de usuario",
+    "remember_me": "Recordarme",
+    "submit_login": "Iniciar sesión",
+    "submit_register": "Crear cuenta",
+    "already_account": "¿Ya tienes cuenta?",
+    "no_account": "¿Aún no tienes cuenta?",
+    "primary_language": "Idioma principal",
+    "secondary_languages": "Idiomas secundarios (opcional)"
+  },
+  "chat": {
+    "placeholder": "Enviar un mensaje...",
+    "send": "Enviar",
+    "coins_hint": "¡Cada mensaje gana PSG Coins!",
+    "no_messages": "Sin mensajes aún. ¡Sé el primero!"
+  },
+  "packs": {
+    "title": "Tienda",
+    "buy": "Comprar",
+    "open": "Abrir",
+    "cost": "Precio",
+    "free": "Gratis",
+    "not_enough_coins": "PSG Coins insuficientes",
+    "new_card": "¡Nueva carta!"
+  },
+  "collection": {
+    "title": "Mi Colección",
+    "empty": "Sin cartas. ¡Abre sobres para empezar!",
+    "filter_all": "Todo",
+    "filter_joueur": "Jugadores",
+    "filter_entraineur": "Entrenadores",
+    "filter_trophee": "Trofeos",
+    "sort_overall": "Overall",
+    "sort_name": "Nombre",
+    "sort_recent": "Reciente"
+  },
+  "equipe": {
+    "title": "Mi Equipo",
+    "liste": "Lista",
+    "builder": "Constructor",
+    "overall": "Overall",
+    "formation": "Formación",
+    "empty_slot": "Puesto vacío",
+    "no_compatible": "Sin cartas compatibles"
+  },
+  "match": {
+    "title": "Partido",
+    "searching": "Buscando rival...",
+    "found": "¡Rival encontrado!",
+    "vs_bot": "vs Bot",
+    "result_win": "¡Victoria!",
+    "result_loss": "Derrota",
+    "result_draw": "Empate",
+    "coins_earned": "PSG Coins ganados"
+  },
+  "histoire": {
+    "title": "Historia",
+    "chapter": "Capítulo",
+    "locked": "Bloqueado",
+    "completed": "Completado",
+    "start": "Jugar",
+    "objectives": "Objetivos",
+    "reward": "Recompensa"
+  },
+  "config": {
+    "title": "Ajustes",
+    "pseudo": "Nombre de usuario",
+    "change_pseudo": "Cambiar nombre",
+    "pseudo_cost": "Coste: 50 PSG Coins",
+    "avatar": "Foto de perfil",
+    "languages": "Idiomas",
+    "sound": "Volumen de sonido",
+    "logout": "Cerrar sesión"
+  },
+  "common": {
+    "loading": "Cargando...",
+    "error": "Ha ocurrido un error",
+    "back": "Volver",
+    "confirm": "Confirmar",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "coins": "PSG Coins"
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "nav": {
+    "chat": "Chat",
+    "packs": "Packs",
+    "collection": "Collection",
+    "equipe": "Team",
+    "match": "Match",
+    "histoire": "Story",
+    "config": "Settings"
+  },
+  "auth": {
+    "login": "Log In",
+    "register": "Sign Up",
+    "email": "Email address",
+    "password": "Password",
+    "pseudo": "Username",
+    "remember_me": "Remember me",
+    "submit_login": "Log In",
+    "submit_register": "Create Account",
+    "already_account": "Already have an account?",
+    "no_account": "No account yet?",
+    "primary_language": "Primary language",
+    "secondary_languages": "Secondary languages (optional)"
+  },
+  "chat": {
+    "placeholder": "Send a message...",
+    "send": "Send",
+    "coins_hint": "Every message earns PSG Coins!",
+    "no_messages": "No messages yet. Be the first!"
+  },
+  "packs": {
+    "title": "Shop",
+    "buy": "Buy",
+    "open": "Open",
+    "cost": "Cost",
+    "free": "Free",
+    "not_enough_coins": "Not enough PSG Coins",
+    "new_card": "New card!"
+  },
+  "collection": {
+    "title": "My Collection",
+    "empty": "No cards. Open packs to get started!",
+    "filter_all": "All",
+    "filter_joueur": "Players",
+    "filter_entraineur": "Coaches",
+    "filter_trophee": "Trophies",
+    "sort_overall": "Overall",
+    "sort_name": "Name",
+    "sort_recent": "Recent"
+  },
+  "equipe": {
+    "title": "My Team",
+    "liste": "List",
+    "builder": "Builder",
+    "overall": "Overall",
+    "formation": "Formation",
+    "empty_slot": "Empty slot",
+    "no_compatible": "No compatible cards"
+  },
+  "match": {
+    "title": "Match",
+    "searching": "Looking for opponent...",
+    "found": "Opponent found!",
+    "vs_bot": "vs Bot",
+    "result_win": "Victory!",
+    "result_loss": "Defeat",
+    "result_draw": "Draw",
+    "coins_earned": "PSG Coins earned"
+  },
+  "histoire": {
+    "title": "Story",
+    "chapter": "Chapter",
+    "locked": "Locked",
+    "completed": "Completed",
+    "start": "Play",
+    "objectives": "Objectives",
+    "reward": "Reward"
+  },
+  "config": {
+    "title": "Settings",
+    "pseudo": "Username",
+    "change_pseudo": "Change username",
+    "pseudo_cost": "Cost: 50 PSG Coins",
+    "avatar": "Profile picture",
+    "languages": "Languages",
+    "sound": "Sound volume",
+    "logout": "Log out"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "back": "Back",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "save": "Save",
+    "coins": "PSG Coins"
+  }
+}

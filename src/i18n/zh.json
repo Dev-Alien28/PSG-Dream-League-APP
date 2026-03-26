@@ -1,0 +1,98 @@
+{
+  "nav": {
+    "chat": "聊天",
+    "packs": "卡包",
+    "collection": "收藏",
+    "equipe": "球队",
+    "match": "比赛",
+    "histoire": "故事",
+    "config": "设置"
+  },
+  "auth": {
+    "login": "登录",
+    "register": "注册",
+    "email": "电子邮箱",
+    "password": "密码",
+    "pseudo": "用户名",
+    "remember_me": "记住我",
+    "submit_login": "登录",
+    "submit_register": "创建账号",
+    "already_account": "已有账号？",
+    "no_account": "还没有账号？",
+    "primary_language": "主语言",
+    "secondary_languages": "次要语言（可选）"
+  },
+  "chat": {
+    "placeholder": "发送消息...",
+    "send": "发送",
+    "coins_hint": "每条消息都能赚取PSG金币！",
+    "no_messages": "暂无消息，快来第一个发言吧！"
+  },
+  "packs": {
+    "title": "商店",
+    "buy": "购买",
+    "open": "开包",
+    "cost": "费用",
+    "free": "免费",
+    "not_enough_coins": "PSG金币不足",
+    "new_card": "新卡片！"
+  },
+  "collection": {
+    "title": "我的收藏",
+    "empty": "暂无卡片，开包获取吧！",
+    "filter_all": "全部",
+    "filter_joueur": "球员",
+    "filter_entraineur": "教练",
+    "filter_trophee": "奖杯",
+    "sort_overall": "综合评分",
+    "sort_name": "姓名",
+    "sort_recent": "最新"
+  },
+  "equipe": {
+    "title": "我的球队",
+    "liste": "列表",
+    "builder": "组建",
+    "overall": "综合评分",
+    "formation": "阵型",
+    "empty_slot": "空位",
+    "no_compatible": "没有适合的卡片"
+  },
+  "match": {
+    "title": "比赛",
+    "searching": "正在匹配对手...",
+    "found": "找到对手！",
+    "vs_bot": "vs 机器人",
+    "result_win": "胜利！",
+    "result_loss": "失败",
+    "result_draw": "平局",
+    "coins_earned": "获得PSG金币"
+  },
+  "histoire": {
+    "title": "故事模式",
+    "chapter": "章节",
+    "locked": "未解锁",
+    "completed": "已完成",
+    "start": "开始",
+    "objectives": "目标",
+    "reward": "奖励"
+  },
+  "config": {
+    "title": "设置",
+    "pseudo": "用户名",
+    "change_pseudo": "更改用户名",
+    "pseudo_cost": "费用：50 PSG金币",
+    "avatar": "头像",
+    "languages": "语言",
+    "sound": "音量",
+    "logout": "退出登录"
+  },
+  "common": {
+    "loading": "加载中...",
+    "error": "发生错误",
+    "back": "返回",
+    "confirm": "确认",
+    "cancel": "取消",
+    "save": "保存",
+    "coins": "PSG金币"
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "nav": {
+    "chat": "Chat",
+    "packs": "Packs",
+    "collection": "Collection",
+    "equipe": "Équipe",
+    "match": "Match",
+    "histoire": "Histoire",
+    "config": "Config"
+  },
+  "auth": {
+    "login": "Connexion",
+    "register": "Inscription",
+    "email": "Adresse e-mail",
+    "password": "Mot de passe",
+    "pseudo": "Pseudonyme",
+    "remember_me": "Se souvenir de moi",
+    "submit_login": "Se connecter",
+    "submit_register": "Créer mon compte",
+    "already_account": "Déjà un compte ?",
+    "no_account": "Pas encore de compte ?",
+    "primary_language": "Langue principale",
+    "secondary_languages": "Langues secondaires (facultatif)"
+  },
+  "chat": {
+    "placeholder": "Envoyer un message...",
+    "send": "Envoyer",
+    "coins_hint": "Chaque message rapporte des PSG Coins !",
+    "no_messages": "Aucun message pour l'instant. Sois le premier !"
+  },
+  "packs": {
+    "title": "Boutique",
+    "buy": "Acheter",
+    "open": "Ouvrir",
+    "cost": "Coût",
+    "free": "Gratuit",
+    "not_enough_coins": "Pas assez de PSG Coins",
+    "new_card": "Nouvelle carte !"
+  },
+  "collection": {
+    "title": "Ma Collection",
+    "empty": "Aucune carte. Ouvre des packs pour commencer !",
+    "filter_all": "Tout",
+    "filter_joueur": "Joueurs",
+    "filter_entraineur": "Entraîneurs",
+    "filter_trophee": "Trophées",
+    "sort_overall": "Overall",
+    "sort_name": "Nom",
+    "sort_recent": "Récent"
+  },
+  "equipe": {
+    "title": "Mon Équipe",
+    "liste": "Liste",
+    "builder": "Builder",
+    "overall": "Overall",
+    "formation": "Formation",
+    "empty_slot": "Poste vide",
+    "no_compatible": "Aucune carte compatible"
+  },
+  "match": {
+    "title": "Match",
+    "searching": "Recherche d'adversaire...",
+    "found": "Adversaire trouvé !",
+    "vs_bot": "vs Bot",
+    "result_win": "Victoire !",
+    "result_loss": "Défaite",
+    "result_draw": "Match nul",
+    "coins_earned": "PSG Coins gagnés"
+  },
+  "histoire": {
+    "title": "Histoire",
+    "chapter": "Chapitre",
+    "locked": "Verrouillé",
+    "completed": "Terminé",
+    "start": "Jouer",
+    "objectives": "Objectifs",
+    "reward": "Récompense"
+  },
+  "config": {
+    "title": "Paramètres",
+    "pseudo": "Pseudonyme",
+    "change_pseudo": "Changer de pseudo",
+    "pseudo_cost": "Coût : 50 PSG Coins",
+    "avatar": "Photo de profil",
+    "languages": "Langues",
+    "sound": "Volume sonore",
+    "logout": "Se déconnecter"
+  },
+  "common": {
+    "loading": "Chargement...",
+    "error": "Une erreur est survenue",
+    "back": "Retour",
+    "confirm": "Confirmer",
+    "cancel": "Annuler",
+    "save": "Sauvegarder",
+    "coins": "PSG Coins"
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "nav": {
+    "chat": "دردشة",
+    "packs": "حزم",
+    "collection": "مجموعة",
+    "equipe": "الفريق",
+    "match": "مباراة",
+    "histoire": "القصة",
+    "config": "الإعدادات"
+  },
+  "auth": {
+    "login": "تسجيل الدخول",
+    "register": "إنشاء حساب",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "pseudo": "اسم المستخدم",
+    "remember_me": "تذكرني",
+    "submit_login": "دخول",
+    "submit_register": "إنشاء الحساب",
+    "already_account": "هل لديك حساب؟",
+    "no_account": "ليس لديك حساب؟",
+    "primary_language": "اللغة الأساسية",
+    "secondary_languages": "لغات ثانوية (اختياري)"
+  },
+  "chat": {
+    "placeholder": "أرسل رسالة...",
+    "send": "إرسال",
+    "coins_hint": "كل رسالة تكسب PSG Coins!",
+    "no_messages": "لا رسائل بعد. كن الأول!"
+  },
+  "packs": {
+    "title": "المتجر",
+    "buy": "شراء",
+    "open": "فتح",
+    "cost": "التكلفة",
+    "free": "مجاني",
+    "not_enough_coins": "PSG Coins غير كافية",
+    "new_card": "بطاقة جديدة!"
+  },
+  "collection": {
+    "title": "مجموعتي",
+    "empty": "لا بطاقات. افتح حزماً للبدء!",
+    "filter_all": "الكل",
+    "filter_joueur": "اللاعبون",
+    "filter_entraineur": "المدربون",
+    "filter_trophee": "الكؤوس",
+    "sort_overall": "التقييم",
+    "sort_name": "الاسم",
+    "sort_recent": "الأحدث"
+  },
+  "equipe": {
+    "title": "فريقي",
+    "liste": "القائمة",
+    "builder": "البناء",
+    "overall": "التقييم",
+    "formation": "التشكيل",
+    "empty_slot": "مكان فارغ",
+    "no_compatible": "لا بطاقات متوافقة"
+  },
+  "match": {
+    "title": "مباراة",
+    "searching": "البحث عن خصم...",
+    "found": "تم العثور على خصم!",
+    "vs_bot": "ضد بوت",
+    "result_win": "فوز!",
+    "result_loss": "خسارة",
+    "result_draw": "تعادل",
+    "coins_earned": "PSG Coins المكتسبة"
+  },
+  "histoire": {
+    "title": "القصة",
+    "chapter": "فصل",
+    "locked": "مقفل",
+    "completed": "مكتمل",
+    "start": "العب",
+    "objectives": "الأهداف",
+    "reward": "المكافأة"
+  },
+  "config": {
+    "title": "الإعدادات",
+    "pseudo": "اسم المستخدم",
+    "change_pseudo": "تغيير الاسم",
+    "pseudo_cost": "التكلفة: 50 PSG Coins",
+    "avatar": "صورة الملف الشخصي",
+    "languages": "اللغات",
+    "sound": "مستوى الصوت",
+    "logout": "تسجيل الخروج"
+  },
+  "common": {
+    "loading": "جارٍ التحميل...",
+    "error": "حدث خطأ",
+    "back": "رجوع",
+    "confirm": "تأكيد",
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "coins": "PSG Coins"
+  }
+}
