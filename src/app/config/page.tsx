@@ -5,6 +5,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { getCurrentUser, logout } from '@/lib/authHelpers'
 import {
+  supabase,
   updateUserPseudo,
   updateUserAvatar,
   updateUserLanguages,
@@ -85,11 +86,32 @@ export default function ConfigPage() {
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !user) return
-    // Simulate URL (in production: upload to Supabase Storage)
-    const url = URL.createObjectURL(file)
+
+    setSaving(true)
+
+    // 1. Upload dans Supabase Storage
+    const ext = file.name.split('.').pop()
+    const filePath = `avatars/${user.id}.${ext}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, file, { upsert: true })
+
+    if (uploadError) {
+      showMsg("Erreur lors de l'upload.", 'error')
+      setSaving(false)
+      return
+    }
+
+    // 2. Récupère l'URL publique
+    const { data } = supabase.storage.from('avatars').getPublicUrl(filePath)
+    const url = data.publicUrl
+
+    // 3. Sauvegarde en BDD
     await updateUserAvatar(user.id, url)
     setUser((prev) => prev ? { ...prev, avatar_url: url } : prev)
     showMsg('Avatar mis à jour !', 'ok')
+    setSaving(false)
   }
 
   const handleLogout = async () => {
