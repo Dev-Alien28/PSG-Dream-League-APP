@@ -2,19 +2,49 @@
 
 import { createClient } from '@supabase/supabase-js'
 import type { User, UserProfile } from '@/types/user'
-import type { OwnedCard } from '@/types/card'
+import type { Card, OwnedCard } from '@/types/card'
 import type { MatchResult } from '@/types/match'
+import { allCards } from '../../data/packs'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
+// ─── HELPER ───────────────────────────────────────────────────────────────────
+
+function calculerOverall(stats: Record<string, number>): number {
+  const valeurs = Object.values(stats).filter((v) => typeof v === 'number')
+  return Math.round(valeurs.reduce((a, b) => a + b, 0) / valeurs.length)
+}
+
+function rowVersOwnedCard(row: any): OwnedCard | null {
+  const carteJSON = (allCards as any[]).find((c) => c.id === row.card_id)
+  if (!carteJSON) return null
+
+  return {
+    id: carteJSON.id,
+    name: carteJSON.nom,
+    category: carteJSON.type,
+    rarity: carteJSON.rareté,
+    position: carteJSON.position,
+    image: carteJSON.image,
+    stats: {
+      ...carteJSON.stats,
+      overall: calculerOverall(carteJSON.stats),
+    },
+    owned_id: row.owned_id,
+    user_id: row.user_id,
+    obtained_at: row.obtained_at,
+    pack_source: row.pack_source,
+  }
+}
+
 // ─── USER ─────────────────────────────────────────────────────────────────────
 
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
   const { data, error } = await supabase
-    .from('user_profiles')
+    .from('profiles')
     .select('*')
     .eq('id', userId)
     .single()
@@ -28,7 +58,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 
 export async function updateUserPseudo(userId: string, pseudo: string): Promise<boolean> {
   const { error } = await supabase
-    .from('users')
+    .from('profiles')
     .update({ pseudo })
     .eq('id', userId)
 
@@ -41,7 +71,7 @@ export async function updateUserPseudo(userId: string, pseudo: string): Promise<
 
 export async function updateUserAvatar(userId: string, avatarUrl: string): Promise<boolean> {
   const { error } = await supabase
-    .from('users')
+    .from('profiles')
     .update({ avatar_url: avatarUrl })
     .eq('id', userId)
 
@@ -58,7 +88,7 @@ export async function updateUserLanguages(
   secondaryLanguages: string[]
 ): Promise<boolean> {
   const { error } = await supabase
-    .from('users')
+    .from('profiles')
     .update({
       primary_language: primaryLanguage,
       secondary_languages: secondaryLanguages,
@@ -76,7 +106,7 @@ export async function updateUserLanguages(
 
 export async function getUserCoins(userId: string): Promise<number> {
   const { data, error } = await supabase
-    .from('users')
+    .from('profiles')
     .select('coins')
     .eq('id', userId)
     .single()
@@ -90,7 +120,7 @@ export async function getUserCoins(userId: string): Promise<number> {
 
 export async function updateUserCoins(userId: string, coins: number): Promise<boolean> {
   const { error } = await supabase
-    .from('users')
+    .from('profiles')
     .update({ coins })
     .eq('id', userId)
 
@@ -117,7 +147,7 @@ export async function decrementUserCoins(userId: string, amount: number): Promis
 export async function getUserCollection(userId: string): Promise<OwnedCard[]> {
   const { data, error } = await supabase
     .from('owned_cards')
-    .select('*, cards(*)')
+    .select('*')
     .eq('user_id', userId)
     .order('obtained_at', { ascending: false })
 
@@ -126,14 +156,10 @@ export async function getUserCollection(userId: string): Promise<OwnedCard[]> {
     return []
   }
 
-  // Flatten joined data
-  return (data ?? []).map((row: any) => ({
-    ...row.cards,
-    owned_id: row.id,
-    user_id: row.user_id,
-    obtained_at: row.obtained_at,
-    pack_source: row.pack_source,
-  })) as OwnedCard[]
+  return (data ?? []).flatMap((row: any) => {
+    const carte = rowVersOwnedCard(row)
+    return carte ? [carte] : []
+  })
 }
 
 export async function addCardToCollection(
@@ -149,7 +175,7 @@ export async function addCardToCollection(
       pack_source: packSource,
       obtained_at: new Date().toISOString(),
     })
-    .select('*, cards(*)')
+    .select('*')
     .single()
 
   if (error) {
@@ -157,13 +183,7 @@ export async function addCardToCollection(
     return null
   }
 
-  return {
-    ...data.cards,
-    owned_id: data.id,
-    user_id: data.user_id,
-    obtained_at: data.obtained_at,
-    pack_source: data.pack_source,
-  } as OwnedCard
+  return rowVersOwnedCard(data)
 }
 
 // ─── CHAT ─────────────────────────────────────────────────────────────────────
@@ -237,23 +257,19 @@ export function subscribeToChatMessages(
 // ─── MATCHS ───────────────────────────────────────────────────────────────────
 
 export async function saveMatchResult(result: MatchResult): Promise<boolean> {
-  const { error } = await supabase.from('match_results').insert({
+  const { error } = await supabase.from('matches').insert({
     id: result.id,
     home_user_id: result.home.user_id,
     away_user_id: result.away.user_id,
     home_pseudo: result.home.pseudo,
     away_pseudo: result.away.pseudo,
-    score_home: result.score_home,
-    score_away: result.score_away,
+    home_score: result.score_home,
+    away_score: result.score_away,
     events: result.events,
     winner: result.winner,
     coins_earned: result.coins_earned,
     played_at: result.played_at,
     is_bot: result.is_bot,
-    home_formation: result.home.formation,
-    away_formation: result.away.formation,
-    home_overall: result.home.overall,
-    away_overall: result.away.overall,
   })
 
   if (error) {
@@ -265,7 +281,7 @@ export async function saveMatchResult(result: MatchResult): Promise<boolean> {
 
 export async function getUserMatchHistory(userId: string, limit = 20): Promise<MatchResult[]> {
   const { data, error } = await supabase
-    .from('match_results')
+    .from('matches')
     .select('*')
     .or(`home_user_id.eq.${userId},away_user_id.eq.${userId}`)
     .order('played_at', { ascending: false })
@@ -282,7 +298,7 @@ export async function getUserMatchHistory(userId: string, limit = 20): Promise<M
 
 export async function getLeaderboard(limit = 100): Promise<UserProfile[]> {
   const { data, error } = await supabase
-    .from('user_profiles')
+    .from('profiles')
     .select('*')
     .order('wins', { ascending: false })
     .limit(limit)
@@ -299,28 +315,44 @@ export async function getLeaderboard(limit = 100): Promise<UserProfile[]> {
 export async function getUserStoryProgress(userId: string): Promise<Record<number, boolean>> {
   const { data, error } = await supabase
     .from('story_progress')
-    .select('chapitre, completed')
+    .select('current_chapter, completed_chapters')
     .eq('user_id', userId)
+    .single()
 
   if (error) {
     console.error('[supabase] getUserStoryProgress:', error.message)
     return {}
   }
 
-  return (data ?? []).reduce((acc: Record<number, boolean>, row: any) => {
-    acc[row.chapitre] = row.completed
-    return acc
-  }, {})
+  const completed: Record<number, boolean> = {}
+  for (const ch of data?.completed_chapters ?? []) {
+    completed[ch] = true
+  }
+  return completed
 }
 
 export async function saveChapterProgress(
   userId: string,
   chapitre: number,
-  completed: boolean
 ): Promise<boolean> {
+  const { data: current } = await supabase
+    .from('story_progress')
+    .select('completed_chapters, current_chapter')
+    .eq('user_id', userId)
+    .single()
+
+  const completed = current?.completed_chapters ?? []
+  if (!completed.includes(chapitre)) completed.push(chapitre)
+  const nextChapter = Math.max(current?.current_chapter ?? 1, chapitre + 1)
+
   const { error } = await supabase
     .from('story_progress')
-    .upsert({ user_id: userId, chapitre, completed }, { onConflict: 'user_id,chapitre' })
+    .upsert({
+      user_id: userId,
+      current_chapter: nextChapter,
+      completed_chapters: completed,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' })
 
   if (error) {
     console.error('[supabase] saveChapterProgress:', error.message)
