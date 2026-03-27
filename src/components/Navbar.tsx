@@ -5,11 +5,16 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useTranslation } from '@/i18n/useTranslation'
 
+const HIDDEN_ROUTES = ['/login', '/register']
+
 export default function Navbar() {
   const pathname = usePathname()
   const { t } = useTranslation()
   const [visible, setVisible] = useState(true)
   const [lastY, setLastY] = useState(0)
+
+  // Cache la navbar sur les pages auth
+  if (HIDDEN_ROUTES.includes(pathname)) return null
 
   useEffect(() => {
     const handleScroll = () => {
