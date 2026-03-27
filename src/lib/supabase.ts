@@ -4,41 +4,11 @@ import { createClient } from '@supabase/supabase-js'
 import type { User, UserProfile } from '@/types/user'
 import type { Card, OwnedCard } from '@/types/card'
 import type { MatchResult } from '@/types/match'
-import { allCards } from '../../data/packs'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
-// ─── HELPER ───────────────────────────────────────────────────────────────────
-
-function calculerOverall(stats: Record<string, number>): number {
-  const valeurs = Object.values(stats).filter((v) => typeof v === 'number')
-  return Math.round(valeurs.reduce((a, b) => a + b, 0) / valeurs.length)
-}
-
-function rowVersOwnedCard(row: any): OwnedCard | null {
-  const carteJSON = (allCards as any[]).find((c) => c.id === row.card_id)
-  if (!carteJSON) return null
-
-  return {
-    id: carteJSON.id,
-    name: carteJSON.nom,
-    category: carteJSON.type,
-    rarity: carteJSON.rareté,
-    position: carteJSON.position,
-    image: carteJSON.image,
-    stats: {
-      ...carteJSON.stats,
-      overall: calculerOverall(carteJSON.stats),
-    },
-    owned_id: row.owned_id,
-    user_id: row.user_id,
-    obtained_at: row.obtained_at,
-    pack_source: row.pack_source,
-  }
-}
 
 // ─── USER ─────────────────────────────────────────────────────────────────────
 
@@ -156,10 +126,10 @@ export async function getUserCollection(userId: string): Promise<OwnedCard[]> {
     return []
   }
 
-  return (data ?? []).flatMap((row: any) => {
-    const carte = rowVersOwnedCard(row)
-    return carte ? [carte] : []
-  })
+  const { rowToOwnedCard } = await import('./cardData')
+  // ✅ FIXED: rowToOwnedCard est async, on attend toutes les promesses
+  const results = await Promise.all((data ?? []).map((row: any) => rowToOwnedCard(row)))
+  return results.filter((card): card is OwnedCard => card !== null)
 }
 
 export async function addCardToCollection(
@@ -183,7 +153,9 @@ export async function addCardToCollection(
     return null
   }
 
-  return rowVersOwnedCard(data)
+  const { rowToOwnedCard } = await import('./cardData')
+  // ✅ FIXED: await rowToOwnedCard
+  return await rowToOwnedCard(data)
 }
 
 // ─── CHAT ─────────────────────────────────────────────────────────────────────
@@ -198,7 +170,7 @@ export interface ChatMessage {
   created_at: string
 }
 
-export async function getChatMessages(lang: string, limit = 50): Promise<ChatMessage[]> {
+export async function getChatMessages(lang: string, limit = 80): Promise<ChatMessage[]> {
   const { data, error } = await supabase
     .from('chat_messages')
     .select('*')
@@ -228,7 +200,6 @@ export async function sendChatMessage(
       avatar_url: avatarUrl,
       lang,
       content,
-      created_at: new Date().toISOString(),
     })
     .select()
     .single()
@@ -240,18 +211,50 @@ export async function sendChatMessage(
   return data as ChatMessage
 }
 
+// ✅ FIXED: subscribeToChatMessages — retourne le channel avant .subscribe()
+// et accepte un callback onStatus pour éviter la double subscription
 export function subscribeToChatMessages(
   lang: string,
-  onMessage: (msg: ChatMessage) => void
+  onMessage: (msg: ChatMessage) => void,
+  onStatus?: (status: string) => void
 ) {
-  return supabase
-    .channel(`chat:${lang}`)
+  const channel = supabase
+    .channel(`chat-room-${lang}`, {
+      config: {
+        broadcast: { self: false },
+      },
+    })
     .on(
       'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `lang=eq.${lang}` },
-      (payload) => onMessage(payload.new as ChatMessage)
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'chat_messages',
+        filter: `lang=eq.${lang}`,
+      },
+      (payload: any) => {
+        if (payload.new) {
+          onMessage(payload.new as ChatMessage)
+        }
+      }
     )
-    .subscribe()
+
+  // ✅ Une seule subscription, avec le callback de statut intégré
+  channel.subscribe((status: string) => {
+    if (status === 'SUBSCRIBED') {
+      console.log(`[chat] ✅ Realtime connecté pour lang=${lang}`)
+    }
+    if (status === 'CHANNEL_ERROR') {
+      console.error(`[chat] ❌ Erreur Realtime pour lang=${lang}`)
+    }
+    if (status === 'TIMED_OUT') {
+      console.warn(`[chat] ⏰ Timeout Realtime pour lang=${lang}`)
+    }
+    onStatus?.(status)
+  })
+
+  // ✅ Retourne le channel (et non le résultat de .subscribe())
+  return channel
 }
 
 // ─── MATCHS ───────────────────────────────────────────────────────────────────
@@ -333,7 +336,7 @@ export async function getUserStoryProgress(userId: string): Promise<Record<numbe
 
 export async function saveChapterProgress(
   userId: string,
-  chapitre: number,
+  chapitre: number
 ): Promise<boolean> {
   const { data: current } = await supabase
     .from('story_progress')
@@ -347,12 +350,15 @@ export async function saveChapterProgress(
 
   const { error } = await supabase
     .from('story_progress')
-    .upsert({
-      user_id: userId,
-      current_chapter: nextChapter,
-      completed_chapters: completed,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id' })
+    .upsert(
+      {
+        user_id: userId,
+        current_chapter: nextChapter,
+        completed_chapters: completed,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id' }
+    )
 
   if (error) {
     console.error('[supabase] saveChapterProgress:', error.message)
