@@ -15,7 +15,7 @@ async function loadTranslations(lang: Language): Promise<any> {
     return data.default
   } catch {
     // Fallback sur le français si la langue n'existe pas
-    const fallback = await import('@/i18n/locales/fr.json')
+    const fallback = await import('@/i18n/fr.json')
     translationCache[lang] = fallback.default
     return fallback.default
   }
