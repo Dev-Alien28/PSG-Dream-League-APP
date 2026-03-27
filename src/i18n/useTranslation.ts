@@ -11,7 +11,7 @@ async function loadTranslations(lang: Language): Promise<any> {
   if (translationCache[lang]) return translationCache[lang]
 
   try {
-    const data = await import(`@/i18n/locales/${lang}.json`)
+    const data = await import(`@/i18n/${lang}.json`)
     translationCache[lang] = data.default
     return data.default
   } catch (err) {
@@ -41,16 +41,19 @@ export function useTranslation() {
 
   // 🔹 Recharge les traductions quand la langue change
   useEffect(() => {
-    let isMounted = true
+  let isMounted = true
 
-    loadTranslations(lang).then((data) => {
-      if (isMounted) setTranslations(data)
-    })
+  // 🔥 reset immédiat pour forcer le refresh UI
+  setTranslations(null)
 
-    return () => {
-      isMounted = false
-    }
-  }, [lang])
+  loadTranslations(lang).then((data) => {
+    if (isMounted) setTranslations(data)
+  })
+
+  return () => {
+    isMounted = false
+  }
+}, [lang])
 
   // 🔹 Écoute les changements globaux (config / login)
   useEffect(() => {
@@ -66,9 +69,9 @@ export function useTranslation() {
 
   // 🔹 Fonction de traduction
   const t = (key: string): string => {
-    if (!translations) return key
-    return resolve(translations, key)
-  }
+  if (!translations) return '...'
+  return resolve(translations, key)
+}
 
   return { t, lang }
 }
