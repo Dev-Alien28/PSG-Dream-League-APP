@@ -10,9 +10,9 @@ import {
   updateUserAvatar,
   updateUserLanguages,
 } from '@/lib/supabase'
-import { spendCoinsForPseudoChange } from '@/lib/coinEngine'
-import { COIN_COSTS } from '@/lib/coinEngine'
+import { spendCoinsForPseudoChange, COIN_COSTS } from '@/lib/coinEngine'
 import CoinDisplay from '@/components/CoinDisplay'
+import { useTranslation, setAppLanguage } from '@/i18n/useTranslation'
 import type { User, Language } from '@/types/user'
 
 const LANGUAGES: { code: Language; label: string; flag: string }[] = [
@@ -28,6 +28,7 @@ const LANGUAGES: { code: Language; label: string; flag: string }[] = [
 
 export default function ConfigPage() {
   const router = useRouter()
+  const { t } = useTranslation()
   const [user, setUser] = useState<User | null>(null)
   const [coins, setCoins] = useState(0)
   const [pseudoEdit, setPseudoEdit] = useState('')
@@ -80,36 +81,32 @@ export default function ConfigPage() {
     setSaving(true)
     const ok = await updateUserLanguages(user.id, primaryLang, secondaryLangs)
     setSaving(false)
-    showMsg(ok ? 'Langues mises à jour !' : 'Erreur lors de la sauvegarde.', ok ? 'ok' : 'error')
+    if (ok) {
+      // ✅ Met à jour la langue de l'app immédiatement
+      setAppLanguage(primaryLang)
+      showMsg(t('config.title') === 'Settings' ? 'Languages saved!' : 'Langues mises à jour !', 'ok')
+    } else {
+      showMsg('Erreur lors de la sauvegarde.', 'error')
+    }
   }
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !user) return
-
     setSaving(true)
-
-    // 1. Upload dans Supabase Storage
     const ext = file.name.split('.').pop()
     const filePath = `avatars/${user.id}.${ext}`
-
     const { error: uploadError } = await supabase.storage
       .from('avatars')
       .upload(filePath, file, { upsert: true })
-
     if (uploadError) {
       showMsg("Erreur lors de l'upload.", 'error')
       setSaving(false)
       return
     }
-
-    // 2. Récupère l'URL publique
     const { data } = supabase.storage.from('avatars').getPublicUrl(filePath)
-    const url = data.publicUrl
-
-    // 3. Sauvegarde en BDD
-    await updateUserAvatar(user.id, url)
-    setUser((prev) => prev ? { ...prev, avatar_url: url } : prev)
+    await updateUserAvatar(user.id, data.publicUrl)
+    setUser((prev) => prev ? { ...prev, avatar_url: data.publicUrl } : prev)
     showMsg('Avatar mis à jour !', 'ok')
     setSaving(false)
   }
@@ -149,8 +146,6 @@ export default function ConfigPage() {
           letter-spacing: 0.06em;
           text-transform: uppercase;
         }
-
-        /* Profile section */
         .profile-section {
           padding: 24px 16px;
           display: flex;
@@ -159,10 +154,7 @@ export default function ConfigPage() {
           gap: 12px;
           border-bottom: 1px solid var(--border-subtle);
         }
-        .avatar-wrap {
-          position: relative;
-          cursor: pointer;
-        }
+        .avatar-wrap { position: relative; cursor: pointer; }
         .avatar-circle {
           width: 80px;
           height: 80px;
@@ -181,10 +173,8 @@ export default function ConfigPage() {
         .avatar-circle img { width: 100%; height: 100%; object-fit: cover; }
         .avatar-edit-badge {
           position: absolute;
-          bottom: 0;
-          right: 0;
-          width: 24px;
-          height: 24px;
+          bottom: 0; right: 0;
+          width: 24px; height: 24px;
           background: #c4a050;
           border-radius: 50%;
           border: 2px solid var(--bg-primary);
@@ -205,8 +195,6 @@ export default function ConfigPage() {
           color: var(--text-muted);
           letter-spacing: 0.04em;
         }
-
-        /* Settings list */
         .settings-list {
           padding: 16px;
           display: flex;
@@ -245,12 +233,7 @@ export default function ConfigPage() {
           border-bottom: 1px solid rgba(255,255,255,0.04);
         }
         .settings-row:last-child { border-bottom: none; }
-        .settings-row-icon {
-          font-size: 20px;
-          width: 28px;
-          text-align: center;
-          flex-shrink: 0;
-        }
+        .settings-row-icon { font-size: 20px; width: 28px; text-align: center; flex-shrink: 0; }
         .settings-row-label {
           font-family: 'Rajdhani', sans-serif;
           font-size: 15px;
@@ -265,8 +248,6 @@ export default function ConfigPage() {
           color: var(--text-muted);
           font-weight: 600;
         }
-
-        /* Pseudo edit inline */
         .pseudo-edit-wrap { padding: 12px 16px 12px; }
         .pseudo-input-row { display: flex; gap: 8px; }
         .pseudo-cost-note {
@@ -277,8 +258,6 @@ export default function ConfigPage() {
           text-align: right;
           letter-spacing: 0.06em;
         }
-
-        /* Lang selector */
         .lang-picker-wrap { padding: 12px 16px; }
         .lang-picker-sub {
           font-family: 'Rajdhani', sans-serif;
@@ -319,8 +298,6 @@ export default function ConfigPage() {
           border-color: #c4a050;
           color: #e8c97a;
         }
-
-        /* Toast */
         .settings-toast {
           position: fixed;
           bottom: calc(var(--navbar-height) + 16px);
@@ -346,9 +323,10 @@ export default function ConfigPage() {
           border: 1px solid rgba(248,113,113,0.3);
           color: #f87171;
         }
-        @keyframes slideUp { from { opacity:0; transform:translateX(-50%) translateY(12px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
-
-        /* Danger */
+        @keyframes slideUp {
+          from { opacity:0; transform:translateX(-50%) translateY(12px); }
+          to { opacity:1; transform:translateX(-50%) translateY(0); }
+        }
         .danger-btn {
           width: 100%;
           padding: 14px;
@@ -369,16 +347,17 @@ export default function ConfigPage() {
       `}</style>
 
       <div className="config-page">
-        {/* Header */}
         <div className="config-header">
-          <div className="config-title">Paramètres</div>
+          <div className="config-title">{t('config.title')}</div>
           <CoinDisplay amount={coins} size="sm" />
         </div>
 
-        {/* Toast */}
-        {msg && <div className={`settings-toast ${msg.type}`}>{msg.type === 'ok' ? '✅' : '⚠️'} {msg.text}</div>}
+        {msg && (
+          <div className={`settings-toast ${msg.type}`}>
+            {msg.type === 'ok' ? '✅' : '⚠️'} {msg.text}
+          </div>
+        )}
 
-        {/* Profile */}
         <div className="profile-section">
           <div className="avatar-wrap" onClick={() => fileRef.current?.click()}>
             <div className="avatar-circle">
@@ -396,11 +375,15 @@ export default function ConfigPage() {
 
         <div className="settings-list">
           {/* Pseudo */}
-          <div className="settings-section-label">Profil</div>
+          <div className="settings-section-label">{t('config.pseudo')}</div>
           <div className="settings-card">
-            <div className="settings-row" onClick={() => setEditingPseudo(!editingPseudo)} style={{ cursor: 'pointer' }}>
+            <div
+              className="settings-row"
+              onClick={() => setEditingPseudo(!editingPseudo)}
+              style={{ cursor: 'pointer' }}
+            >
               <span className="settings-row-icon">✏️</span>
-              <span className="settings-row-label">Pseudo</span>
+              <span className="settings-row-label">{t('config.pseudo')}</span>
               <span className="settings-row-value">{user.pseudo}</span>
               <span style={{ color: 'var(--text-muted)', fontSize: 14 }}>{editingPseudo ? '▲' : '▼'}</span>
             </div>
@@ -413,7 +396,7 @@ export default function ConfigPage() {
                     value={pseudoEdit}
                     onChange={(e) => setPseudoEdit(e.target.value)}
                     maxLength={20}
-                    placeholder="Nouveau pseudo"
+                    placeholder={t('config.pseudo')}
                   />
                   <button
                     className="btn btn-gold"
@@ -424,16 +407,16 @@ export default function ConfigPage() {
                     OK
                   </button>
                 </div>
-                <div className="pseudo-cost-note">Coût : {COIN_COSTS.CHANGE_PSEUDO} ₱</div>
+                <div className="pseudo-cost-note">{t('config.pseudo_cost')}</div>
               </div>
             )}
           </div>
 
           {/* Langues */}
-          <div className="settings-section-label">Langues</div>
+          <div className="settings-section-label">{t('config.languages')}</div>
           <div className="settings-card">
             <div className="lang-picker-wrap">
-              <div className="lang-picker-sub">Langue principale</div>
+              <div className="lang-picker-sub">{t('auth.primary_language')}</div>
               <div className="lang-grid-small">
                 {LANGUAGES.map((l) => (
                   <button
@@ -450,7 +433,9 @@ export default function ConfigPage() {
                 ))}
               </div>
 
-              <div className="lang-picker-sub" style={{ marginTop: 12 }}>Langues secondaires</div>
+              <div className="lang-picker-sub" style={{ marginTop: 12 }}>
+                {t('auth.secondary_languages')}
+              </div>
               <div className="lang-grid-small">
                 {LANGUAGES.filter((l) => l.code !== primaryLang).map((l) => (
                   <button
@@ -470,13 +455,13 @@ export default function ConfigPage() {
                 onClick={handleSaveLangs}
                 disabled={saving}
               >
-                Sauvegarder
+                {t('common.save')}
               </button>
             </div>
           </div>
 
           {/* About */}
-          <div className="settings-section-label">À propos</div>
+          <div className="settings-section-label">App</div>
           <div className="settings-card">
             <div className="settings-row">
               <span className="settings-row-icon">⚜️</span>
@@ -491,9 +476,8 @@ export default function ConfigPage() {
             </div>
           </div>
 
-          {/* Logout */}
           <button className="danger-btn" onClick={handleLogout}>
-            🚪 Se déconnecter
+            🚪 {t('config.logout')}
           </button>
         </div>
       </div>

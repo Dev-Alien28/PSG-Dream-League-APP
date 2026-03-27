@@ -1,10 +1,10 @@
-// src/app/(auth)/login/page.tsx
 'use client'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { login } from '@/lib/authHelpers'
+import { initUserLanguage } from '@/lib/langInit'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -19,13 +19,21 @@ export default function LoginPage() {
       setError('Veuillez remplir tous les champs.')
       return
     }
+
     setLoading(true)
     setError(null)
+
     const { user, error: err } = await login(email, password, rememberMe)
+
     setLoading(false)
+
     if (err) {
       setError(err)
     } else if (user) {
+      // ✅ Initialisation de la langue utilisateur
+      await initUserLanguage(user)
+
+      // ✅ Redirection
       router.push('/chat')
     }
   }
