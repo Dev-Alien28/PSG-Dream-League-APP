@@ -1,27 +1,29 @@
-// src/i18n/useTranslation.ts
 'use client'
 
 import { useEffect, useState } from 'react'
 import type { Language } from '@/types/user'
 
-// Cache en mémoire pour ne pas recharger les JSONs
+// Cache pour éviter de recharger les JSON
 const translationCache: Partial<Record<Language, any>> = {}
 
+// Chargement dynamique des fichiers de langue
 async function loadTranslations(lang: Language): Promise<any> {
   if (translationCache[lang]) return translationCache[lang]
+
   try {
     const data = await import(`@/i18n/locales/${lang}.json`)
     translationCache[lang] = data.default
     return data.default
-  } catch {
-    // Fallback sur le français si la langue n'existe pas
+  } catch (err) {
+    console.warn(`Langue "${lang}" introuvable, fallback FR.`)
+
     const fallback = await import('@/i18n/fr.json')
     translationCache[lang] = fallback.default
     return fallback.default
   }
 }
 
-// Résout un chemin pointé : "nav.chat" → translations.nav.chat
+// Permet de lire "nav.chat" → translations.nav.chat
 function resolve(obj: any, path: string): string {
   return path.split('.').reduce((acc, key) => acc?.[key], obj) ?? path
 }
@@ -30,27 +32,39 @@ export function useTranslation() {
   const [lang, setLangState] = useState<Language>('fr')
   const [translations, setTranslations] = useState<any>(null)
 
+  // 🔹 Init langue depuis localStorage
   useEffect(() => {
-    // Lire la langue depuis localStorage (sauvegardée au login/config)
     const stored = localStorage.getItem('psg_lang') as Language | null
     const activeLang = stored ?? 'fr'
     setLangState(activeLang)
-
-    loadTranslations(activeLang).then(setTranslations)
   }, [])
 
-  // Écoute les changements de langue (depuis la page config)
+  // 🔹 Recharge les traductions quand la langue change
+  useEffect(() => {
+    let isMounted = true
+
+    loadTranslations(lang).then((data) => {
+      if (isMounted) setTranslations(data)
+    })
+
+    return () => {
+      isMounted = false
+    }
+  }, [lang])
+
+  // 🔹 Écoute les changements globaux (config / login)
   useEffect(() => {
     const handler = () => {
       const stored = localStorage.getItem('psg_lang') as Language | null
       const activeLang = stored ?? 'fr'
       setLangState(activeLang)
-      loadTranslations(activeLang).then(setTranslations)
     }
+
     window.addEventListener('psg_lang_changed', handler)
     return () => window.removeEventListener('psg_lang_changed', handler)
   }, [])
 
+  // 🔹 Fonction de traduction
   const t = (key: string): string => {
     if (!translations) return key
     return resolve(translations, key)
@@ -59,8 +73,10 @@ export function useTranslation() {
   return { t, lang }
 }
 
-// Appelé depuis la page config après sauvegarde des langues
+// 🔹 Setter global (appelé depuis login / config)
 export function setAppLanguage(lang: Language) {
   localStorage.setItem('psg_lang', lang)
+
+  // ⚡ important pour forcer le refresh UI
   window.dispatchEvent(new Event('psg_lang_changed'))
 }
