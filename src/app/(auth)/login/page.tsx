@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { login } from '@/lib/authHelpers'
 import { initUserLanguage } from '@/lib/langInit'
 
@@ -30,10 +31,7 @@ export default function LoginPage() {
     if (err) {
       setError(err)
     } else if (user) {
-      // ✅ Initialisation de la langue utilisateur
       await initUserLanguage(user)
-
-      // ✅ Redirection
       router.push('/chat')
     }
   }
@@ -61,15 +59,14 @@ export default function LoginPage() {
         .auth-logo {
           text-align: center;
           margin-bottom: 36px;
-        }
-        .auth-logo-icon {
-          font-size: 52px;
-          display: block;
-          margin-bottom: 10px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 12px;
         }
         .auth-logo-title {
           font-family: 'Rajdhani', sans-serif;
-          font-size: 28px;
+          font-size: 26px;
           font-weight: 700;
           letter-spacing: 0.1em;
           text-transform: uppercase;
@@ -77,6 +74,7 @@ export default function LoginPage() {
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
+          line-height: 1.1;
         }
         .auth-logo-sub {
           font-family: 'Rajdhani', sans-serif;
@@ -84,7 +82,7 @@ export default function LoginPage() {
           color: rgba(255,255,255,0.25);
           letter-spacing: 0.2em;
           text-transform: uppercase;
-          margin-top: 4px;
+          margin-top: 2px;
         }
         .auth-form {
           display: flex;
@@ -148,13 +146,8 @@ export default function LoginPage() {
           cursor: pointer;
           transition: all 0.2s ease;
           box-shadow: 0 4px 20px rgba(196,160,80,0.35);
-          position: relative;
-          overflow: hidden;
         }
-        .auth-submit:disabled {
-          opacity: 0.7;
-          cursor: not-allowed;
-        }
+        .auth-submit:disabled { opacity: 0.7; cursor: not-allowed; }
         .auth-submit:not(:disabled):active { transform: scale(0.97); }
         .auth-footer {
           text-align: center;
@@ -170,19 +163,16 @@ export default function LoginPage() {
           font-weight: 700;
         }
         .auth-footer a:hover { text-decoration: underline; }
-        .auth-divider {
-          height: 1px;
-          background: rgba(255,255,255,0.07);
-          margin: 8px 0;
-        }
       `}</style>
 
       <div className="auth-container">
         <div className="auth-card">
           <div className="auth-logo">
-            <span className="auth-logo-icon">⚜️</span>
-            <div className="auth-logo-title">PSG Fan</div>
-            <div className="auth-logo-sub">Fan App Non Officielle</div>
+            <Image src="/logo.png" alt="PSG Dream League" width={100} height={100} priority />
+            <div>
+              <div className="auth-logo-title">PSG Dream League</div>
+              <div className="auth-logo-sub">Fan App Non Officielle</div>
+            </div>
           </div>
 
           <div className="auth-form">

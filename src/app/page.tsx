@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { getSession } from '@/lib/authHelpers'
 
 export default function SplashPage() {
@@ -78,23 +79,19 @@ export default function SplashPage() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 8px;
+          gap: 16px;
         }
         .splash-emblem {
-          width: 120px;
-          height: 120px;
-          background: linear-gradient(135deg, #001a5e 0%, #002590 50%, #001a5e 100%);
-          border-radius: 50%;
-          border: 2px solid rgba(196,160,80,0.5);
+          width: 150px;
+          height: 150px;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 60px;
-          box-shadow: 0 0 60px rgba(0,26,94,0.6), 0 0 120px rgba(0,26,94,0.3), inset 0 2px 0 rgba(255,255,255,0.1);
+          filter: drop-shadow(0 0 40px rgba(196,160,80,0.35)) drop-shadow(0 0 80px rgba(0,26,94,0.5));
         }
         .splash-title {
           font-family: 'Rajdhani', sans-serif;
-          font-size: 32px;
+          font-size: 28px;
           font-weight: 700;
           letter-spacing: 0.12em;
           text-transform: uppercase;
@@ -104,6 +101,8 @@ export default function SplashPage() {
           -webkit-text-fill-color: transparent;
           background-clip: text;
           animation: shimmerSweep 2s linear 1s infinite;
+          text-align: center;
+          line-height: 1.1;
         }
         .splash-subtitle {
           font-family: 'Rajdhani', sans-serif;
@@ -138,9 +137,19 @@ export default function SplashPage() {
         <div className="splash-ring" />
         <div className="splash-ring splash-ring-2" />
         <div className="splash-logo">
-          <div className="splash-emblem">⚜️</div>
-          <div className="splash-title">PSG Fan</div>
-          <div className="splash-subtitle">Fan App Non Officielle</div>
+          <div className="splash-emblem">
+            <Image
+              src="/logo.png"
+              alt="PSG Dream League"
+              width={150}
+              height={150}
+              priority
+            />
+          </div>
+          <div>
+            <div className="splash-title">PSG Dream League</div>
+            <div className="splash-subtitle">Fan App Non Officielle</div>
+          </div>
         </div>
         <div className="splash-dots">
           <div className="splash-dot" />

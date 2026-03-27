@@ -4,6 +4,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { register } from '@/lib/authHelpers'
 import type { Language } from '@/types/user'
 
@@ -91,11 +92,14 @@ export default function RegisterPage() {
         .auth-logo {
           text-align: center;
           margin-bottom: 28px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 10px;
         }
-        .auth-logo-icon { font-size: 44px; display: block; margin-bottom: 8px; }
         .auth-logo-title {
           font-family: 'Rajdhani', sans-serif;
-          font-size: 24px;
+          font-size: 22px;
           font-weight: 700;
           letter-spacing: 0.1em;
           text-transform: uppercase;
@@ -180,8 +184,6 @@ export default function RegisterPage() {
           font-weight: 600;
         }
         .auth-footer a { color: #c4a050; text-decoration: none; font-weight: 700; }
-
-        /* Language selector */
         .lang-section-title {
           font-family: 'Rajdhani', sans-serif;
           font-size: 11px;
@@ -212,26 +214,11 @@ export default function RegisterPage() {
           color: rgba(255,255,255,0.6);
           text-align: left;
         }
-        .lang-btn:hover {
-          background: rgba(196,160,80,0.08);
-          border-color: rgba(196,160,80,0.25);
-        }
-        .lang-btn.selected {
-          background: rgba(196,160,80,0.12);
-          border-color: rgba(196,160,80,0.4);
-          color: #c4a050;
-        }
-        .lang-btn.primary-selected {
-          background: rgba(196,160,80,0.18);
-          border-color: #c4a050;
-          color: #e8c97a;
-        }
+        .lang-btn:hover { background: rgba(196,160,80,0.08); border-color: rgba(196,160,80,0.25); }
+        .lang-btn.selected { background: rgba(196,160,80,0.12); border-color: rgba(196,160,80,0.4); color: #c4a050; }
+        .lang-btn.primary-selected { background: rgba(196,160,80,0.18); border-color: #c4a050; color: #e8c97a; }
         .lang-flag { font-size: 18px; }
-        .lang-check {
-          margin-left: auto;
-          font-size: 12px;
-          color: #4ade80;
-        }
+        .lang-check { margin-left: auto; font-size: 12px; color: #4ade80; }
         .back-btn {
           background: rgba(255,255,255,0.06);
           border: 1px solid rgba(255,255,255,0.1);
@@ -247,18 +234,14 @@ export default function RegisterPage() {
           transition: all 0.15s ease;
         }
         .back-btn:hover { background: rgba(255,255,255,0.1); }
-        .step-actions {
-          display: flex;
-          gap: 10px;
-          margin-top: 6px;
-        }
+        .step-actions { display: flex; gap: 10px; margin-top: 6px; }
         .step-actions .auth-submit { margin-top: 0; }
       `}</style>
 
       <div className="auth-container">
         <div className="auth-card">
           <div className="auth-logo">
-            <span className="auth-logo-icon">⚜️</span>
+            <Image src="/logo.png" alt="PSG Dream League" width={80} height={80} priority />
             <div className="auth-logo-title">Créer un compte</div>
           </div>
 
