@@ -75,7 +75,7 @@ export async function completeChapter(
   const progress = await getUserStoryProgress(userId)
   const isFirstTime = !progress[chapterId]
 
-  await saveChapterProgress(userId, chapterId, true)
+  await saveChapterProgress(userId, chapterId, )
   const coinsEarned = await rewardStoryChapter(userId, isFirstTime)
 
   return { coinsEarned, isFirstTime }

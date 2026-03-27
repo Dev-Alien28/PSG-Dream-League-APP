@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import type { User, UserProfile } from '@/types/user'
 import type { Card, OwnedCard } from '@/types/card'
 import type { MatchResult } from '@/types/match'
-import { allCards } from '../../data/packs'  // ← chemin alias corrigé
+import { allCards } from '../../data/packs'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -334,7 +334,6 @@ export async function getUserStoryProgress(userId: string): Promise<Record<numbe
 export async function saveChapterProgress(
   userId: string,
   chapitre: number,
-  _completed: boolean = true  // ← paramètre ajouté pour correspondre aux appels dans storyEngine
 ): Promise<boolean> {
   const { data: current } = await supabase
     .from('story_progress')
@@ -357,48 +356,6 @@ export async function saveChapterProgress(
 
   if (error) {
     console.error('[supabase] saveChapterProgress:', error.message)
-    return false
-  }
-  return true
-}
-
-// ─── ÉQUIPE ───────────────────────────────────────────────────────────────────
-
-export async function getUserTeam(userId: string): Promise<any | null> {
-  const { data, error } = await supabase
-    .from('teams')
-    .select('*')
-    .eq('user_id', userId)
-    .single()
-
-  if (error) {
-    console.error('[supabase] getUserTeam:', error.message)
-    return null
-  }
-  return data
-}
-
-export async function saveUserTeam(
-  userId: string,
-  formation: string,
-  slots: any[],
-  overall: number
-): Promise<boolean> {
-  const { error } = await supabase
-    .from('teams')
-    .upsert(
-      {
-        user_id: userId,
-        formation,
-        slots,
-        overall,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id' }
-    )
-
-  if (error) {
-    console.error('[supabase] saveUserTeam:', error.message)
     return false
   }
   return true
