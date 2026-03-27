@@ -13,7 +13,6 @@ export default function Navbar() {
   const [visible, setVisible] = useState(true)
   const lastYRef = useRef(0)
 
-  // ✅ useEffect AVANT le return conditionnel
   useEffect(() => {
     if (HIDDEN_ROUTES.includes(pathname)) return
 
@@ -24,14 +23,15 @@ export default function Navbar() {
     }
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
-  }, [pathname]) // ✅ dépendance : pathname uniquement
+  }, [pathname])
 
-  // ✅ return conditionnel APRÈS les hooks
   if (HIDDEN_ROUTES.includes(pathname)) return null
 
   const isActive = (href: string) => {
     if (href === '/chat') return pathname.startsWith('/chat')
-    if (href === '/equipe/builder') return pathname.startsWith('/equipe')
+    if (href === '/collection') return pathname.startsWith('/collection') || pathname.startsWith('/equipe')
+    if (href === '/match') return pathname.startsWith('/match') || pathname.startsWith('/histoire')
+    if (href === '/config') return pathname.startsWith('/config')
     return pathname === href || pathname.startsWith(href + '/')
   }
 
@@ -67,20 +67,6 @@ export default function Navbar() {
       ),
     },
     {
-      href: '/equipe/builder',
-      label: t('nav.equipe'),
-      icon: (active: boolean) => (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.6} strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="8" r="4"/>
-          <path d="M6 20v-2a6 6 0 0 1 12 0v2"/>
-          <path d="M19 8a3 3 0 1 1 0-6"/>
-          <path d="M5 8a3 3 0 1 0 0-6"/>
-          <path d="M22 20v-1.5a4.5 4.5 0 0 0-3-4.24"/>
-          <path d="M2 20v-1.5a4.5 4.5 0 0 1 3-4.24"/>
-        </svg>
-      ),
-    },
-    {
       href: '/match',
       label: t('nav.match'),
       icon: (active: boolean) => (
@@ -88,16 +74,6 @@ export default function Navbar() {
           <circle cx="12" cy="12" r="10"/>
           <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
           <path d="M2 12h20"/>
-        </svg>
-      ),
-    },
-    {
-      href: '/histoire',
-      label: t('nav.histoire'),
-      icon: (active: boolean) => (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.6} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
         </svg>
       ),
     },
