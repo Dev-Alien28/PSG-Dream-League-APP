@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from '@/i18n/useTranslation'
 
 const HIDDEN_ROUTES = ['/login', '/register']
@@ -11,20 +11,23 @@ export default function Navbar() {
   const pathname = usePathname()
   const { t } = useTranslation()
   const [visible, setVisible] = useState(true)
-  const [lastY, setLastY] = useState(0)
+  const lastYRef = useRef(0)
 
-  // Cache la navbar sur les pages auth
-  if (HIDDEN_ROUTES.includes(pathname)) return null
-
+  // ✅ useEffect AVANT le return conditionnel
   useEffect(() => {
+    if (HIDDEN_ROUTES.includes(pathname)) return
+
     const handleScroll = () => {
       const currentY = window.scrollY
-      setVisible(currentY < lastY || currentY < 60)
-      setLastY(currentY)
+      setVisible(currentY < lastYRef.current || currentY < 60)
+      lastYRef.current = currentY
     }
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
-  }, [lastY])
+  }, [pathname]) // ✅ dépendance : pathname uniquement
+
+  // ✅ return conditionnel APRÈS les hooks
+  if (HIDDEN_ROUTES.includes(pathname)) return null
 
   const isActive = (href: string) => {
     if (href === '/chat') return pathname.startsWith('/chat')
