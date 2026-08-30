@@ -163,9 +163,10 @@ function generateBotCard(position: PlayerPosition, targetOverall: number): Owned
   const overall = clamp(targetOverall + jitter, 20, 99)
 
   const baseStats = buildStatsForPosition(position, overall)
+  const cardId = `bot_${position}_${Math.random().toString(36).slice(2)}`
 
   return {
-    id: `bot_${position}_${Math.random().toString(36).slice(2)}`,
+    id: cardId,
     owned_id: `bot_owned_${Math.random().toString(36).slice(2)}`,
     user_id: 'bot',
     name: botPlayerName(position),
@@ -176,6 +177,9 @@ function generateBotCard(position: PlayerPosition, targetOverall: number): Owned
     stats: { ...baseStats, overall },
     obtained_at: new Date().toISOString(),
     pack_source: 'bot',
+    base_card_id: cardId,
+    grade: null,
+    stat_bonus: 0,
   }
 }
 

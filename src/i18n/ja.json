@@ -5,6 +5,8 @@
     "collection": "コレクション",
     "equipe": "チーム",
     "match": "試合",
+    "tournoi": "トーナメント",
+    "boutique": "ショップ",
     "histoire": "ストーリー",
     "config": "設定"
   },
@@ -80,7 +82,7 @@
     "title": "設定",
     "pseudo": "ユーザー名",
     "change_pseudo": "名前を変更",
-    "pseudo_cost": "費用：50 PSGコイン",
+    "pseudo_cost": "費用：200 PSGコイン",
     "avatar": "プロフィール画像",
     "languages": "言語",
     "sound": "音量",

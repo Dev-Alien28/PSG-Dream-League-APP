@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getCurrentUser } from '@/lib/authHelpers'
-import { rewardChatMessage } from '@/lib/coinEngine'
+import { rewardMinigame, COIN_REWARDS } from '@/lib/coinEngine'
 import CoinDisplay from '@/components/CoinDisplay'
 import Minigame from '@/components/Minigame'
 import type { User } from '@/types/user'
@@ -21,6 +21,14 @@ export default function MinijeuPage() {
       setCoins(u.coins)
     })
   }, [router])
+
+  const handleWin = async () => {
+    if (!user) return
+    // Le montant crédité vient du serveur (rewardMinigame), jamais de la valeur
+    // reçue du composant Minigame, pour que le gain soit vraiment persisté et fiable.
+    const earned = await rewardMinigame(user.id)
+    setCoins((prev) => prev + earned)
+  }
 
   if (!user) return <div className="loader-center"><div className="loader" /></div>
 
@@ -92,10 +100,10 @@ export default function MinijeuPage() {
         </div>
 
         <div className="minijeu-content">
-          <div className="minijeu-reward-label">🎯 Penalty — Gagne 25 ₱</div>
+          <div className="minijeu-reward-label">🎯 Penalty — Gagne {COIN_REWARDS.MINIGAME_WIN} ₱</div>
           <Minigame
-            reward={25}
-            onWin={(earned) => setCoins((prev) => prev + earned)}
+            reward={COIN_REWARDS.MINIGAME_WIN}
+            onWin={handleWin}
           />
         </div>
       </div>

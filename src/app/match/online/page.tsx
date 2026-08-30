@@ -5,22 +5,15 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getCurrentUser } from '@/lib/authHelpers'
 import { getUserCollection, saveMatchResult } from '@/lib/supabase'
+import { loadPlayerTeam } from '@/lib/teamHelpers'
 import { simulateMatch } from '@/lib/matchEngine'
 import { searchForOpponent } from '@/lib/matchmaking'
 import { rewardMatch } from '@/lib/coinEngine'
 import { computeTeamOverall } from '@/lib/cardHelpers'
+import { playWhistle, playVictory, playDefeat, playClick } from '@/lib/soundEngine'
 import CoinDisplay from '@/components/CoinDisplay'
 import type { User } from '@/types/user'
-import type { Team, MatchResult, Formation } from '@/types/match'
-import type { PlayerPosition } from '@/types/card'
-
-const FORMATION_LAYOUTS: Record<Formation, PlayerPosition[]> = {
-  '4-3-3': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant', 'Attaquant'],
-  '4-4-2': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant'],
-  '4-2-3-1': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Attaquant'],
-  '3-5-2': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant'],
-  '5-3-2': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant'],
-}
+import type { Team, MatchResult } from '@/types/match'
 
 type PageState = 'idle' | 'searching' | 'found' | 'playing' | 'result'
 
@@ -38,21 +31,9 @@ export default function MatchOnlinePage() {
       if (!u) { router.replace('/login'); return }
       setUser(u)
       setCoins(u.coins)
-      getUserCollection(u.id).then((col) => {
-        const formation: Formation = '4-3-3'
-        const positions = FORMATION_LAYOUTS[formation]
-        const usedIds = new Set<string>()
-        const slots = positions.map((position) => {
-          const available = col.filter(
-            (c) => c.category === 'joueur' && c.position === position && !usedIds.has(c.owned_id)
-          )
-          available.sort((a, b) => b.stats.overall - a.stats.overall)
-          const card = available[0] || null
-          if (card) usedIds.add(card.owned_id)
-          return { position, card }
-        })
-        const overall = computeTeamOverall(slots)
-        setUserTeam({ user_id: u.id, pseudo: u.pseudo, formation, slots, overall })
+      getUserCollection(u.id).then(async (col) => {
+        const team = await loadPlayerTeam(u.id, u.pseudo, col, computeTeamOverall)
+        setUserTeam(team)
       })
     })
   }, [router])
@@ -73,6 +54,7 @@ export default function MatchOnlinePage() {
 
     setPageState('playing')
     setMatchStatus('Match en cours…')
+    playWhistle()
     await new Promise((r) => setTimeout(r, 2000))
 
     const matchResult = simulateMatch(userTeam, opponent, isBot)
@@ -81,6 +63,10 @@ export default function MatchOnlinePage() {
     const resultType = matchResult.winner === 'home' ? 'win' : matchResult.winner === 'draw' ? 'draw' : 'loss'
     const earned = await rewardMatch(user.id, resultType)
     setCoins((prev) => prev + earned)
+
+    if (resultType === 'win') playVictory()
+    else if (resultType === 'loss') playDefeat()
+    else playClick()
 
     setResult(matchResult)
     setPageState('result')

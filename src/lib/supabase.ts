@@ -3,7 +3,7 @@
 import { createClient } from '@supabase/supabase-js'
 import type { User, UserProfile } from '@/types/user'
 import type { Card, OwnedCard } from '@/types/card'
-import type { MatchResult } from '@/types/match'
+import type { MatchResult, Formation } from '@/types/match'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -142,6 +142,7 @@ export async function addCardToCollection(
     .insert({
       user_id: userId,
       card_id: cardId,
+      base_card_id: cardId,
       pack_source: packSource,
       obtained_at: new Date().toISOString(),
     })
@@ -156,6 +157,220 @@ export async function addCardToCollection(
   const { rowToOwnedCard } = await import('./cardData')
   // ✅ FIXED: await rowToOwnedCard
   return await rowToOwnedCard(data)
+}
+
+/**
+ * Consomme des doublons identiques pour créer une carte au grade supérieur.
+ * Passe par la fonction Postgres `craft_card_upgrade` (voir
+ * supabase_migration_grades.sql) pour garantir que la consommation des
+ * doublons et la création de la carte améliorée sont atomiques.
+ */
+export async function craftCardUpgrade(
+  userId: string,
+  baseCardId: string,
+  sourceGrade: string | null,
+  nextGrade: string,
+  needCount: number
+): Promise<{ success: boolean; error?: string }> {
+  const { data, error } = await supabase.rpc('craft_card_upgrade', {
+    p_user_id: userId,
+    p_base_card_id: baseCardId,
+    p_source_grade: sourceGrade,
+    p_next_grade: nextGrade,
+    p_need_count: needCount,
+  })
+
+  if (error) {
+    console.error('[supabase] craftCardUpgrade:', error.message)
+    return { success: false, error: 'Erreur serveur lors du craft.' }
+  }
+  if (!data?.success) {
+    return { success: false, error: data?.error === 'not_enough_duplicates' ? 'Pas assez de doublons.' : 'Erreur lors du craft.' }
+  }
+  return { success: true }
+}
+
+/**
+ * Vend les doublons classiques excédentaires d'une carte (une fois son Ω déjà
+ * en poche). `quantity` null = vend tout le stock vendable.
+ */
+export async function sellCardDuplicates(
+  userId: string,
+  baseCardId: string,
+  rarity: string,
+  quantity: number | null = null
+): Promise<{ success: boolean; sold?: number; gain?: number; error?: string }> {
+  const { data, error } = await supabase.rpc('sell_card_duplicates', {
+    p_user_id: userId,
+    p_base_card_id: baseCardId,
+    p_rarity: rarity,
+    p_quantity: quantity,
+  })
+
+  if (error) {
+    console.error('[supabase] sellCardDuplicates:', error.message)
+    return { success: false, error: 'Erreur serveur lors de la vente.' }
+  }
+  if (!data?.success) {
+    const messages: Record<string, string> = {
+      no_omega: 'Il faut déjà posséder la version Ω de cette carte.',
+      none: 'Aucun doublon classique à vendre.',
+      not_sellable: 'Cette rareté ne peut pas être vendue.',
+    }
+    return { success: false, error: messages[data?.error] ?? 'Erreur lors de la vente.' }
+  }
+  return { success: true, sold: data.sold, gain: data.gain }
+}
+
+/**
+ * Récompense un message de chat, avec limite anti-spam vérifiée côté
+ * serveur (voir supabase_migration_chat_antispam.sql) — impossible à
+ * contourner en appelant directement l'API depuis le client.
+ * Retourne 0 si le délai n'est pas encore écoulé.
+ */
+export async function rewardChatMessageServer(userId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('reward_chat_message', { p_user_id: userId })
+
+  if (error) {
+    console.error('[supabase] rewardChatMessageServer:', error.message)
+    return 0
+  }
+  if (!data?.success) return 0
+  return data.amount ?? 0
+}
+
+// ─── ÉQUIPE ───────────────────────────────────────────────────────────────────
+// Nécessite la table `user_teams` — voir supabase_migration_user_teams.sql à la
+// racine du projet pour la créer dans Supabase (SQL Editor).
+
+export interface StoredTeamSlot {
+  position: string
+  owned_id: string | null
+}
+
+export interface StoredTeam {
+  formation: Formation
+  slots: StoredTeamSlot[]
+}
+
+export async function getUserTeam(userId: string): Promise<StoredTeam | null> {
+  const { data, error } = await supabase
+    .from('user_teams')
+    .select('formation, slots')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (error) {
+    console.error('[supabase] getUserTeam:', error.message)
+    return null
+  }
+  if (!data) return null
+  return { formation: data.formation as Formation, slots: (data.slots as StoredTeamSlot[]) ?? [] }
+}
+
+export async function saveUserTeam(
+  userId: string,
+  formation: Formation,
+  slots: StoredTeamSlot[]
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('user_teams')
+    .upsert(
+      { user_id: userId, formation, slots, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id' }
+    )
+
+  if (error) {
+    console.error('[supabase] saveUserTeam:', error.message)
+    return false
+  }
+  return true
+}
+
+// ─── BOUTIQUE : BOOSTS DE COINS ────────────────────────────────────────────────
+// Nécessite les colonnes ajoutées par supabase_migration_boutique.sql.
+
+export async function activateCoinBoost(userId: string, durationMs: number): Promise<boolean> {
+  const expiresAt = new Date(Date.now() + durationMs).toISOString()
+  const { error } = await supabase
+    .from('profiles')
+    .update({ boost_expires_at: expiresAt })
+    .eq('id', userId)
+
+  if (error) {
+    console.error('[supabase] activateCoinBoost:', error.message)
+    return false
+  }
+  return true
+}
+
+export async function isCoinBoostActive(userId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('boost_expires_at')
+    .eq('id', userId)
+    .single()
+
+  if (error || !data?.boost_expires_at) return false
+  return new Date(data.boost_expires_at).getTime() > Date.now()
+}
+
+// ─── BOUTIQUE : COULEURS D'ÉQUIPE ──────────────────────────────────────────────
+
+export async function unlockTeamColor(userId: string, colorKey: string, currentUnlocked: string[]): Promise<boolean> {
+  const updated = Array.from(new Set([...currentUnlocked, colorKey]))
+  const { error } = await supabase
+    .from('profiles')
+    .update({ unlocked_colors: updated })
+    .eq('id', userId)
+
+  if (error) {
+    console.error('[supabase] unlockTeamColor:', error.message)
+    return false
+  }
+  return true
+}
+
+export async function setSelectedTeamColor(userId: string, colorKey: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ selected_color: colorKey })
+    .eq('id', userId)
+
+  if (error) {
+    console.error('[supabase] setSelectedTeamColor:', error.message)
+    return false
+  }
+  return true
+}
+
+// ─── PITY (garantie Legend) ─────────────────────────────────────────────────
+// Nécessite la colonne ajoutée par supabase_migration_pity.sql.
+// Compteur incrémenté à chaque ouverture du Pack Légende sans carte Legend,
+// remis à 0 dès qu'une est obtenue (par chance ou par garantie).
+
+export async function getPityLegend(userId: string): Promise<number> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('pity_legend')
+    .eq('id', userId)
+    .single()
+
+  if (error || !data) return 0
+  return data.pity_legend ?? 0
+}
+
+export async function setPityLegend(userId: string, value: number): Promise<boolean> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ pity_legend: Math.max(0, value) })
+    .eq('id', userId)
+
+  if (error) {
+    console.error('[supabase] setPityLegend:', error.message)
+    return false
+  }
+  return true
 }
 
 // ─── CHAT ─────────────────────────────────────────────────────────────────────

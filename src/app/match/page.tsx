@@ -5,23 +5,17 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getCurrentUser } from '@/lib/authHelpers'
 import { getUserCollection, saveMatchResult } from '@/lib/supabase'
+import { loadPlayerTeam } from '@/lib/teamHelpers'
 import { simulateMatch, getMatchSummary, getScorers } from '@/lib/matchEngine'
 import { searchForOpponent } from '@/lib/matchmaking'
 import { rewardMatch } from '@/lib/coinEngine'
 import { computeTeamOverall } from '@/lib/cardHelpers'
+import { TEAM_COLOR_PALETTE } from '@/lib/shopData'
+import { playWhistle, playVictory, playDefeat, playClick } from '@/lib/soundEngine'
 import CoinDisplay from '@/components/CoinDisplay'
 import Minigame from '@/components/Minigame'
 import type { User } from '@/types/user'
-import type { Team, MatchResult, Formation } from '@/types/match'
-import type { OwnedCard, PlayerPosition } from '@/types/card'
-
-const FORMATION_LAYOUTS: Record<Formation, PlayerPosition[]> = {
-  '4-3-3': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant', 'Attaquant'],
-  '4-4-2': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant'],
-  '4-2-3-1': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Attaquant'],
-  '3-5-2': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant'],
-  '5-3-2': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant'],
-}
+import type { Team, MatchResult } from '@/types/match'
 
 type PageState = 'idle' | 'searching' | 'found' | 'playing' | 'result' | 'minigame'
 
@@ -40,28 +34,10 @@ export default function MatchPage() {
       if (!u) { router.replace('/login'); return }
       setUser(u)
       setCoins(u.coins)
-      // Build team from collection
-      getUserCollection(u.id).then((col) => {
-        const formation: Formation = '4-3-3'
-        const positions = FORMATION_LAYOUTS[formation]
-        const usedIds = new Set<string>()
-        const slots = positions.map((position) => {
-          const available = col.filter(
-            (c) => c.category === 'joueur' && c.position === position && !usedIds.has(c.owned_id)
-          )
-          available.sort((a, b) => b.stats.overall - a.stats.overall)
-          const card = available[0] || null
-          if (card) usedIds.add(card.owned_id)
-          return { position, card }
-        })
-        const overall = computeTeamOverall(slots)
-        setUserTeam({
-          user_id: u.id,
-          pseudo: u.pseudo,
-          formation,
-          slots,
-          overall,
-        })
+      // Build team from collection (équipe sauvegardée si complète, sinon auto)
+      getUserCollection(u.id).then(async (col) => {
+        const team = await loadPlayerTeam(u.id, u.pseudo, col, computeTeamOverall)
+        setUserTeam(team)
       })
     })
   }, [router])
@@ -82,6 +58,7 @@ export default function MatchPage() {
     await new Promise((r) => setTimeout(r, 1200))
     setPageState('playing')
     setMatchStatus(`Match en cours\u2026`)
+    playWhistle()
     await new Promise((r) => setTimeout(r, 2000))
 
     const matchResult = simulateMatch(userTeam, opponent, isBot)
@@ -90,6 +67,10 @@ export default function MatchPage() {
     const resultType = matchResult.winner === 'home' ? 'win' : matchResult.winner === 'draw' ? 'draw' : 'loss'
     const earned = await rewardMatch(user.id, resultType)
     setCoins((prev) => prev + earned)
+
+    if (resultType === 'win') playVictory()
+    else if (resultType === 'loss') playDefeat()
+    else playClick()
 
     setResult(matchResult)
     setPageState('result')
@@ -136,7 +117,8 @@ export default function MatchPage() {
           height: 56px;
           border-radius: 12px;
           background: linear-gradient(135deg, #001a5e20, #001a5e10);
-          border: 1px solid rgba(0,26,94,0.3);
+          border: 2px solid var(--team-color, rgba(0,26,94,0.3));
+          box-shadow: 0 0 12px var(--team-color-glow, transparent);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -329,7 +311,13 @@ export default function MatchPage() {
           <>
             {userTeam && (
               <div className="match-team-card">
-                <div className="match-team-icon">⚜️</div>
+                <div
+                  className="match-team-icon"
+                  style={{
+                    ['--team-color' as string]: TEAM_COLOR_PALETTE[user.selected_color ?? 'rouge']?.hex ?? 'rgba(0,26,94,0.3)',
+                    ['--team-color-glow' as string]: `${TEAM_COLOR_PALETTE[user.selected_color ?? 'rouge']?.hex ?? '#001a5e'}40`,
+                  }}
+                >⚜️</div>
                 <div className="match-team-info">
                   <div className="match-team-pseudo">{userTeam.pseudo}</div>
                   <div className="match-team-meta">{userTeam.formation} · {userTeam.slots.filter(s => s.card).length}/11 joueurs</div>

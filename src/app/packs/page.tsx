@@ -4,7 +4,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getCurrentUser } from '@/lib/authHelpers'
-import { hasEnoughCoins } from '@/lib/coinEngine'
+import { hasEnoughCoins, spendCoins } from '@/lib/coinEngine'
+import { addCardToCollection, getPityLegend, setPityLegend } from '@/lib/supabase'
+import { RARITY_COLORS as SHARED_RARITY_COLORS } from '@/lib/cardHelpers'
 import PackOpening from '@/components/PackOpening'
 import CoinDisplay from '@/components/CoinDisplay'
 import type { User } from '@/types/user'
@@ -16,6 +18,7 @@ interface DropRates {
   Basic: number
   Advanced: number
   Elite: number
+  Legend?: number
 }
 
 interface PackDef {
@@ -32,7 +35,7 @@ interface RawCard {
   id: string
   type: string
   nom: string
-  'rareté': 'Basic' | 'Advanced' | 'Elite'
+  'rareté': 'Basic' | 'Advanced' | 'Elite' | 'Legend' | 'Unique' | 'Give' | 'Encounter'
   position: string
   stats: Record<string, number>
   image: string
@@ -66,16 +69,24 @@ const PACK_DEFS: PackDef[] = [
     cardCount: 5,
     dropRates: { Basic: 0.30, Advanced: 0.50, Elite: 0.20 },
   },
+  {
+    id: 'pack_legend',
+    name: 'Pack Légende',
+    description: `5 cartes EDF. Chance de tomber sur une carte Légende ultra-rare.`,
+    cost: 1500,
+    cardCount: 5,
+    dropRates: { Basic: 0.25, Advanced: 0.45, Elite: 0.28, Legend: 0.02 },
+  },
 ]
 
-const PACK_ICONS = ['🎁', '⚽', '🏆']
-const PACK_ACCENTS = ['#4ade80', '#c4a050', '#f59e0b']
+const PACK_ICONS = ['🎁', '⚽', '🏆', '👑']
+const PACK_ACCENTS = ['#4ade80', '#c4a050', '#f59e0b', '#f6c343']
+// Après ce nombre d'ouvertures du Pack Légende sans carte Legend, la
+// prochaine ouverture en garantit une (voir src/utils/pity.js du bot).
+const PITY_LEGEND_THRESHOLD = 15
+const PITY_LEGEND_PACK_ID = 'pack_legend'
 
-const RARITY_COLORS: Record<string, string> = {
-  Basic: '#94a3b8',
-  Advanced: '#3b82f6',
-  Elite: '#f59e0b',
-}
+const RARITY_COLORS = SHARED_RARITY_COLORS
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -84,17 +95,34 @@ function computeOverall(stats: Record<string, number>): number {
   return Math.round(values.reduce((s, v) => s + v, 0) / values.length)
 }
 
-function drawCards(pool: RawCard[], count: number, rates: DropRates, userId: string, packId: string): OwnedCard[] {
-  const rarities = ['Basic', 'Advanced', 'Elite'] as const
+function drawCards(
+  pool: RawCard[],
+  count: number,
+  rates: DropRates,
+  userId: string,
+  packId: string,
+  forceGuaranteedRarity?: string
+): OwnedCard[] {
+  const rarities = ['Basic', 'Advanced', 'Elite', 'Legend'] as const
   const cards: OwnedCard[] = []
 
   for (let i = 0; i < count; i++) {
-    const roll = Math.random()
-    let cum = 0
-    let chosenRarity: 'Basic' | 'Advanced' | 'Elite' = 'Basic'
-    for (const r of rarities) {
-      cum += rates[r]
-      if (roll < cum) { chosenRarity = r; break }
+    // Pity : le dernier slot du tirage garantit la rareté demandée si le
+    // seuil est atteint et qu'on ne l'a pas encore obtenue par chance.
+    const isGuaranteedSlot = !!forceGuaranteedRarity && i === count - 1
+      && !cards.some((c) => c.rarity === forceGuaranteedRarity)
+
+    let chosenRarity: string
+    if (isGuaranteedSlot) {
+      chosenRarity = forceGuaranteedRarity!
+    } else {
+      const roll = Math.random()
+      let cum = 0
+      chosenRarity = 'Basic'
+      for (const r of rarities) {
+        cum += rates[r] ?? 0
+        if (roll < cum) { chosenRarity = r; break }
+      }
     }
 
     const eligible = pool.filter((c) => c['rareté'] === chosenRarity)
@@ -115,6 +143,12 @@ function drawCards(pool: RawCard[], count: number, rates: DropRates, userId: str
       stats: { ...picked.stats, overall },
       obtained_at: new Date().toISOString(),
       pack_source: packId,
+      // Ces cartes ne servent qu'à l'animation d'ouverture (affichage
+      // éphémère) — la version qui compte est celle sauvegardée en base via
+      // addCardToCollection, qui applique le vrai grade/bonus le cas échéant.
+      base_card_id: picked.id,
+      grade: null,
+      stat_bonus: 0,
     })
   }
 
@@ -137,23 +171,38 @@ export default function PacksPage() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [coins, setCoins] = useState(0)
-  const [cardPool, setCardPool] = useState<RawCard[]>([])
+  const [cardPools, setCardPools] = useState<Record<string, RawCard[]>>({})
   const [lastFreePack, setLastFreePack] = useState<string | null>(null)
   const [opening, setOpening] = useState(false)
   const [openedCards, setOpenedCards] = useState<OwnedCard[]>([])
   const [currentPackName, setCurrentPackName] = useState('')
   const [loadingPackId, setLoadingPackId] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [pityLegend, setPityLegendState] = useState(0)
 
   useEffect(() => {
     getCurrentUser().then((u) => {
       if (!u) { router.replace('/login'); return }
       setUser(u)
       setCoins(u.coins)
+      setPityLegendState(u.pity_legend ?? 0)
     })
     setLastFreePack(localStorage.getItem('last_free_pack'))
-    import('../../../data/packs/free_pack.json').then((data) => {
-      setCardPool((data.default || data) as unknown as RawCard[])
+    // ⚠️ Avant : un seul pool (free_pack.json) était chargé et réutilisé pour les
+    // 3 packs, donc "Pack PSG" et "Pack Élite" tiraient exactement les mêmes
+    // cartes que le pack gratuit. Chaque pack charge maintenant son propre fichier.
+    Promise.all([
+      import('../../../data/packs/free_pack.json'),
+      import('../../../data/packs/psg_start.json'),
+      import('../../../data/packs/pack_event.json'),
+      import('../../../data/packs/pack_legend.json'),
+    ]).then(([freePackMod, psgStartMod, packEventMod, packLegendMod]) => {
+      setCardPools({
+        free_pack: (freePackMod.default || freePackMod) as unknown as RawCard[],
+        psg_start: (psgStartMod.default || psgStartMod) as unknown as RawCard[],
+        pack_event: (packEventMod.default || packEventMod) as unknown as RawCard[],
+        pack_legend: (packLegendMod.default || packLegendMod) as unknown as RawCard[],
+      })
     })
   }, [router])
 
@@ -182,7 +231,49 @@ export default function PacksPage() {
       }
     }
 
-    const cards = drawCards(cardPool, pack.cardCount, pack.dropRates, user.id, pack.id)
+    const pool = cardPools[pack.id] ?? []
+    if (pool.length === 0) {
+      setErrorMsg('Le pool de cartes de ce pack n\u2019est pas encore chargé, réessaie dans un instant.')
+      setLoadingPackId(null)
+      return
+    }
+
+    const isPityPack = pack.id === PITY_LEGEND_PACK_ID
+    const forcedRarity = isPityPack && pityLegend >= PITY_LEGEND_THRESHOLD ? 'Legend' : undefined
+
+    const cards = drawCards(pool, pack.cardCount, pack.dropRates, user.id, pack.id, forcedRarity)
+    if (cards.length === 0) {
+      setErrorMsg('Erreur lors du tirage des cartes, réessaie.')
+      setLoadingPackId(null)
+      return
+    }
+
+    // ⚠️ Avant : les coins n'étaient jamais débités en base (seulement en mémoire
+    // React), et les cartes tirées n'étaient jamais sauvegardées dans
+    // owned_cards. Un simple rafraîchissement de page effaçait tout le gain.
+    if (pack.cost > 0) {
+      const spent = await spendCoins(user.id, pack.cost)
+      if (!spent) {
+        setErrorMsg(`Il te faut ${pack.cost} \u20B1 pour ce pack.`)
+        setLoadingPackId(null)
+        return
+      }
+    }
+
+    const saved = await Promise.all(
+      cards.map((c) => addCardToCollection(user.id, c.id, pack.id))
+    )
+    const failedCount = saved.filter((s) => s === null).length
+    if (failedCount > 0) {
+      console.error(`[packs] ${failedCount} carte(s) non sauvegardée(s) en base`)
+    }
+
+    if (isPityPack) {
+      const gotLegend = cards.some((c) => c.rarity === 'Legend')
+      const newPity = gotLegend ? 0 : pityLegend + 1
+      setPityLegendState(newPity)
+      await setPityLegend(user.id, newPity)
+    }
 
     if (pack.id === 'free_pack') {
       const now = new Date().toISOString()
@@ -230,7 +321,7 @@ export default function PacksPage() {
             const icon = PACK_ICONS[idx]
             const isFree = pack.id === 'free_pack'
             const isLoading = loadingPackId === pack.id
-            const isDisabled = isLoading || (isFree && !!freeCooldown) || cardPool.length === 0
+            const isDisabled = isLoading || (isFree && !!freeCooldown) || (cardPools[pack.id]?.length ?? 0) === 0
 
             return (
               <div
@@ -257,16 +348,33 @@ export default function PacksPage() {
                     <div className="pack-name">{pack.name}</div>
                     <div className="pack-desc">{pack.description}</div>
                     <div className="pack-rates">
-                      {(['Basic', 'Advanced', 'Elite'] as const).map((r) => (
+                      {(['Basic', 'Advanced', 'Elite', 'Legend'] as const)
+                        .filter((r) => pack.dropRates[r] !== undefined)
+                        .map((r) => (
                         <div key={r} className="pack-rate-pill">
                           <span className="pack-rate-dot" style={{ background: RARITY_COLORS[r] }} />
                           <span className="pack-rate-pct" style={{ color: RARITY_COLORS[r] }}>
-                            {Math.round(pack.dropRates[r] * 100)}%
+                            {Math.round((pack.dropRates[r] ?? 0) * 100)}%
                           </span>
                           <span className="pack-rate-label">{r}</span>
                         </div>
                       ))}
                     </div>
+                    {pack.id === PITY_LEGEND_PACK_ID && (
+                      <div className="pack-pity">
+                        <div className="pack-pity-label">
+                          {pityLegend >= PITY_LEGEND_THRESHOLD
+                            ? '👑 Legend garantie à la prochaine ouverture !'
+                            : `Garantie Legend dans ${PITY_LEGEND_THRESHOLD - pityLegend} ouverture${PITY_LEGEND_THRESHOLD - pityLegend > 1 ? 's' : ''}`}
+                        </div>
+                        <div className="pack-pity-bar">
+                          <div
+                            className="pack-pity-fill"
+                            style={{ width: `${Math.min(100, (pityLegend / PITY_LEGEND_THRESHOLD) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -298,9 +406,9 @@ export default function PacksPage() {
           })}
         </div>
 
-        {cardPool.length > 0 && (
+        {Object.keys(cardPools).length > 0 && (
           <div className="packs-pool-info">
-            {cardPool.length} cartes dans le pool &middot; PSG 24/25 &amp; 25/26
+            {Object.values(cardPools).reduce((sum, p) => sum + p.length, 0)} cartes au total &middot; PSG 24/25 &amp; 25/26
           </div>
         )}
       </div>
@@ -488,6 +596,28 @@ const styles = `
     font-size: 11px;
     color: var(--text-muted);
     font-weight: 600;
+  }
+  .pack-pity {
+    margin-top: 8px;
+  }
+  .pack-pity-label {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    color: #f6c343;
+    margin-bottom: 4px;
+  }
+  .pack-pity-bar {
+    height: 5px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.08);
+    overflow: hidden;
+  }
+  .pack-pity-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #f6c343, #fff085);
+    border-radius: 3px;
+    transition: width 0.3s ease;
   }
 
   .pack-card-footer {

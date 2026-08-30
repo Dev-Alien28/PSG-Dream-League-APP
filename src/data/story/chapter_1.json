@@ -1,0 +1,19 @@
+{
+  "id": 1,
+  "title": "Chapitre 1",
+  "subtitle": "Contenu à venir",
+  "description": "Le mode Histoire arrive bientôt. Reviens plus tard pour découvrir les premiers chapitres !",
+  "coverImage": "/logo.png",
+  "opponent": {
+    "user_id": "bot_placeholder",
+    "pseudo": "Adversaire",
+    "formation": "4-3-3",
+    "slots": [],
+    "overall": 50
+  },
+  "objectives": [
+    { "type": "win", "label": "Gagner le match" }
+  ],
+  "unlockAfter": null,
+  "reward": 0
+}

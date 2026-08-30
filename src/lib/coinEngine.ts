@@ -1,6 +1,6 @@
 // src/lib/coinEngine.ts
 
-import { incrementUserCoins, decrementUserCoins, getUserCoins } from './supabase'
+import { incrementUserCoins, decrementUserCoins, getUserCoins, isCoinBoostActive, rewardChatMessageServer } from './supabase'
 
 // ─── CONSTANTES ───────────────────────────────────────────────────────────────
 
@@ -12,6 +12,9 @@ export const COIN_REWARDS = {
   STORY_CHAPTER: 75,        // Complétion d'un chapitre histoire
   STORY_CHAPTER_FIRST: 150, // Premier succès sur un chapitre
   DAILY_LOGIN: 20,          // Connexion quotidienne
+  MINIGAME_WIN: 25,         // Mini-jeu de tirs au but réussi
+  TOURNAMENT_ROUND_WIN: 60, // Chaque match de tournoi remporté
+  TOURNAMENT_CHAMPION: 300, // Bonus pour avoir remporté tout le tournoi
 } as const
 
 export const COIN_COSTS = {
@@ -21,13 +24,26 @@ export const COIN_COSTS = {
 // ─── ATTRIBUTION ──────────────────────────────────────────────────────────────
 
 /**
- * Récompense pour l'envoi d'un message dans le chat.
- * Limite anti-spam : max 1 gain par message, vérification côté serveur conseillée.
+ * Crédite une récompense en appliquant le boost x2 s'il est actif.
+ * ⚠️ Réservé aux vraies récompenses de gameplay — ne jamais l'utiliser pour un
+ * remboursement (ex: pseudo) où doubler le montant n'aurait aucun sens.
  */
-export async function rewardChatMessage(userId: string): Promise<number> {
-  const amount = COIN_REWARDS.CHAT_MESSAGE
+async function creditReward(userId: string, baseAmount: number): Promise<number> {
+  const boosted = await isCoinBoostActive(userId)
+  const amount = boosted ? baseAmount * 2 : baseAmount
   await incrementUserCoins(userId, amount)
   return amount
+}
+
+/**
+ * Récompense pour l'envoi d'un message dans le chat.
+ * ⚠️ Le délai anti-spam (10s) est vérifié côté serveur (fonction Postgres
+ * reward_chat_message) — avant, il n'était vérifié que côté client, ce qui
+ * pouvait être contourné en appelant directement l'API depuis la console du
+ * navigateur pour farmer des coins à l'infini.
+ */
+export async function rewardChatMessage(userId: string): Promise<number> {
+  return rewardChatMessageServer(userId)
 }
 
 /**
@@ -42,9 +58,7 @@ export async function rewardMatch(
     loss: COIN_REWARDS.MATCH_LOSS,
     draw: COIN_REWARDS.MATCH_DRAW,
   }
-  const amount = rewardMap[result]
-  await incrementUserCoins(userId, amount)
-  return amount
+  return creditReward(userId, rewardMap[result])
 }
 
 /**
@@ -58,17 +72,37 @@ export async function rewardStoryChapter(
   const amount = isFirstTime
     ? COIN_REWARDS.STORY_CHAPTER_FIRST
     : COIN_REWARDS.STORY_CHAPTER
-  await incrementUserCoins(userId, amount)
-  return amount
+  return creditReward(userId, amount)
 }
 
 /**
  * Récompense de connexion quotidienne.
  */
 export async function rewardDailyLogin(userId: string): Promise<number> {
-  const amount = COIN_REWARDS.DAILY_LOGIN
-  await incrementUserCoins(userId, amount)
-  return amount
+  return creditReward(userId, COIN_REWARDS.DAILY_LOGIN)
+}
+
+/**
+ * Récompense pour une victoire au mini-jeu (tirs au but).
+ * Le montant de base vient toujours du serveur (COIN_REWARDS), jamais du
+ * client, pour éviter qu'un montant falsifié soit crédité.
+ */
+export async function rewardMinigame(userId: string): Promise<number> {
+  return creditReward(userId, COIN_REWARDS.MINIGAME_WIN)
+}
+
+/**
+ * Récompense pour un match de tournoi remporté (un tour).
+ */
+export async function rewardTournamentRound(userId: string): Promise<number> {
+  return creditReward(userId, COIN_REWARDS.TOURNAMENT_ROUND_WIN)
+}
+
+/**
+ * Bonus pour avoir remporté le tournoi en entier.
+ */
+export async function rewardTournamentChampion(userId: string): Promise<number> {
+  return creditReward(userId, COIN_REWARDS.TOURNAMENT_CHAMPION)
 }
 
 // ─── DÉPENSES ─────────────────────────────────────────────────────────────────

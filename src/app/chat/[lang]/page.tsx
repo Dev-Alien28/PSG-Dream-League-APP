@@ -11,6 +11,7 @@ import {
   type ChatMessage,
 } from '@/lib/supabase'
 import { rewardChatMessage } from '@/lib/coinEngine'
+import { playCoinGain } from '@/lib/soundEngine'
 import ChatMessageComponent from '@/components/ChatMessage'
 import CoinDisplay from '@/components/CoinDisplay'
 import type { User } from '@/types/user'
@@ -132,14 +133,19 @@ export default function ChatRoomPage() {
     try {
       await sendChatMessage(user.id, user.pseudo, user.avatar_url, lang, content)
 
-      // ✅ Anti-spam : reward max 1 fois toutes les 10 secondes
+      // ✅ Anti-spam vérifié côté serveur — cet appel local évite juste des
+      // requêtes RPC inutiles à chaque frappe, mais la vraie limite est
+      // appliquée par la fonction Postgres reward_chat_message.
       const now = Date.now()
       if (now - lastRewardAt.current > 10_000) {
         lastRewardAt.current = now
         rewardChatMessage(user.id).then((earned) => {
-          setCoins((prev) => prev + earned)
-          setCoinDelta(earned)
-          setTimeout(() => setCoinDelta(0), 2500)
+          if (earned > 0) {
+            playCoinGain()
+            setCoins((prev) => prev + earned)
+            setCoinDelta(earned)
+            setTimeout(() => setCoinDelta(0), 2500)
+          }
         })
       }
     } catch (e) {

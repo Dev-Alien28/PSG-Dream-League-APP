@@ -5,6 +5,8 @@
     "collection": "收藏",
     "equipe": "球队",
     "match": "比赛",
+    "tournoi": "锦标赛",
+    "boutique": "商店",
     "histoire": "故事",
     "config": "设置"
   },
@@ -80,7 +82,7 @@
     "title": "设置",
     "pseudo": "用户名",
     "change_pseudo": "更改用户名",
-    "pseudo_cost": "费用：50 PSG金币",
+    "pseudo_cost": "费用：200 PSG金币",
     "avatar": "头像",
     "languages": "语言",
     "sound": "音量",

@@ -1,7 +1,7 @@
 'use client'
 
 import type { OwnedCard, Card } from '@/types/card'
-import { RARITY_COLORS, RARITY_LABELS } from '@/lib/cardHelpers'
+import { RARITY_COLORS, RARITY_LABELS, gradeSuffix } from '@/lib/cardHelpers'
 
 interface CardProps {
   card: Card | OwnedCard
@@ -32,6 +32,8 @@ const CATEGORY_ICON: Record<string, string> = {
   trophee: '🏆',
 }
 
+const GLOW_RARITIES = new Set(['Elite', 'Legend', 'Unique', 'Give', 'Encounter'])
+
 export default function CardComponent({
   card,
   size = 'md',
@@ -43,6 +45,8 @@ export default function CardComponent({
   const cfg = SIZE_CONFIG[size]
   const rarityColor = RARITY_COLORS[card.rarity]
   const rarityLabel = RARITY_LABELS[card.rarity]
+  const grade = 'grade' in card ? card.grade : null
+  const suffix = gradeSuffix(grade)
 
   const relevantStats = getRelevantStats(card)
 
@@ -97,19 +101,19 @@ export default function CardComponent({
       `}</style>
 
       <div
-        className={`psg-card${selected ? ' selected' : ''}${(glow || card.rarity === 'Elite') ? ' elite-glow' : ''}`}
+        className={`psg-card${selected ? ' selected' : ''}${(glow || GLOW_RARITIES.has(card.rarity)) ? ' elite-glow' : ''}`}
         style={{
           width: cfg.width,
           height: cfg.height,
           background: getCardBackground(card.rarity),
           border: `1px solid ${rarityColor}40`,
-          boxShadow: !glow && card.rarity !== 'Elite'
+          boxShadow: !glow && !GLOW_RARITIES.has(card.rarity)
             ? `0 4px 16px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)`
             : undefined,
         }}
         onClick={onClick}
       >
-        {card.rarity === 'Elite' && <div className="card-shimmer" />}
+        {GLOW_RARITIES.has(card.rarity) && <div className="card-shimmer" />}
 
         {/* Bande supérieure rareté */}
         <div style={{
@@ -221,7 +225,11 @@ export default function CardComponent({
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
           }}>
+            {card.rarity === 'Legend' && '👑 '}
             {card.name}
+            {suffix && (
+              <span style={{ color: rarityColor, marginLeft: 3 }}>{suffix}</span>
+            )}
           </div>
           <div style={{
             fontSize: cfg.rarityFontSize * 0.85,
@@ -296,6 +304,14 @@ export default function CardComponent({
 
 function getCardBackground(rarity: string): string {
   switch (rarity) {
+    case 'Legend':
+      return 'linear-gradient(135deg, #2a1a00 0%, #3d2900 30%, #1a1200 60%, #0d0a00 100%)'
+    case 'Unique':
+      return 'linear-gradient(135deg, #2a0d24 0%, #3d1338 30%, #1a0a17 60%, #0d0508 100%)'
+    case 'Give':
+      return 'linear-gradient(135deg, #2a0505 0%, #3d0a0a 30%, #1a0303 60%, #0d0202 100%)'
+    case 'Encounter':
+      return 'linear-gradient(135deg, #2a2410 0%, #3d3618 30%, #1a1608 60%, #0d0b04 100%)'
     case 'Elite':
       return 'linear-gradient(135deg, #1a1200 0%, #2a1e04 30%, #1a1500 60%, #0d0d0d 100%)'
     case 'Advanced':

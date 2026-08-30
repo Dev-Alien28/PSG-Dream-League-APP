@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
+import { playGoal, playError, playVictory, playClick } from '@/lib/soundEngine'
 
 type Zone = 1 | 2 | 3 | 4 | 5 | 6 | null
 type GamePhase = 'idle' | 'aim' | 'shoot' | 'result'
@@ -34,6 +35,7 @@ export default function Minigame({ onWin, onClose, reward = 25 }: MiniGameProps)
 
     const scored = zone !== keeper
     setWon(scored)
+    scored ? playGoal() : playError()
     setScore((prev) => ({
       goals: prev.goals + (scored ? 1 : 0),
       saves: prev.saves + (scored ? 0 : 1),
@@ -43,7 +45,12 @@ export default function Minigame({ onWin, onClose, reward = 25 }: MiniGameProps)
     aimTimeout.current = setTimeout(() => {
       if (round >= totalRounds) {
         const finalGoals = score.goals + (scored ? 1 : 0)
-        if (finalGoals >= 2 && onWin) onWin(reward)
+        if (finalGoals >= 2) {
+          playVictory()
+          if (onWin) onWin(reward)
+        } else {
+          playClick()
+        }
         setPhase('result')
       } else {
         setRound((r) => r + 1)

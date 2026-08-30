@@ -1,10 +1,10 @@
 // src/app/collection/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { getCurrentUser } from '@/lib/authHelpers'
-import { getUserCollection } from '@/lib/supabase'
+import { getUserCollection, getUserTeam, saveUserTeam, craftCardUpgrade, sellCardDuplicates } from '@/lib/supabase'
 import CardComponent from '@/components/Card'
 import {
   filterByCategory,
@@ -15,15 +15,25 @@ import {
   countByRarity,
   getCompatibleCards,
   computeTeamOverall,
+  groupOwnedCardsForCraft,
+  getSellableStacks,
+  getNextGradeStep,
+  gradeSuffix,
+  isUpgradableRarity,
+  SELL_PRICE,
+  type CardStack,
+  type GradeStep,
 } from '@/lib/cardHelpers'
 import type { OwnedCard, CardRarity, CardCategory, PlayerPosition } from '@/types/card'
 import type { Formation, TeamSlot } from '@/types/match'
+import type { User } from '@/types/user'
+import { playSuccess, playError, playCoinGain } from '@/lib/soundEngine'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type SortMode = 'overall' | 'rarity' | 'name'
 type FilterRarity = CardRarity | 'all'
 type FilterCategory = CardCategory | 'all'
-type Tab = 'cartes' | 'equipe'
+type Tab = 'cartes' | 'equipe' | 'craft'
 
 // ─── Builder constants ────────────────────────────────────────────────────────
 const FORMATIONS: Formation[] = ['4-3-3', '4-4-2', '4-2-3-1', '3-5-2', '5-3-2']
@@ -51,12 +61,24 @@ const POSITION_ROW: Record<PlayerPosition, number> = {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
+// ⚠️ Avant : useSearchParams() était utilisé directement dans le composant par
+// défaut. Next.js exige qu'un composant client qui l'utilise soit enveloppé
+// dans <Suspense>, sinon `next build` échouait entièrement sur /collection.
 export default function CollectionPage() {
+  return (
+    <Suspense fallback={<div className="loader-center"><div className="loader" /></div>}>
+      <CollectionPageInner />
+    </Suspense>
+  )
+}
+
+function CollectionPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const initialTab = (searchParams.get('tab') as Tab) || 'cartes'
 
   const [activeTab, setActiveTab] = useState<Tab>(initialTab)
+  const [user, setUser] = useState<User | null>(null)
   const [cards, setCards] = useState<OwnedCard[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -70,22 +92,113 @@ export default function CollectionPage() {
   const [formation, setFormation] = useState<Formation>('4-3-3')
   const [slots, setSlots] = useState<TeamSlot[]>([])
   const [activeSlotIdx, setActiveSlotIdx] = useState<number | null>(null)
+  const [savingTeam, setSavingTeam] = useState(false)
+  const [saveMsg, setSaveMsg] = useState<string | null>(null)
+
+  // ── Craft state ──
+  const [craftBusyKey, setCraftBusyKey] = useState<string | null>(null)
+  const [craftMsg, setCraftMsg] = useState<{ text: string; ok: boolean } | null>(null)
 
   useEffect(() => {
     getCurrentUser().then((u) => {
       if (!u) { router.replace('/login'); return }
+      setUser(u)
       getUserCollection(u.id).then((c) => {
         setCards(c)
-        setLoading(false)
+        // ⚠️ Avant : l'équipe du builder n'était jamais sauvegardée nulle part,
+        // et se réinitialisait à un 4-3-3 vide à chaque visite de la page.
+        // On recharge maintenant l'équipe enregistrée (si elle existe) et on
+        // reconnecte chaque slot à la carte correspondante dans la collection.
+        getUserTeam(u.id).then((saved) => {
+          if (saved) {
+            const layout = FORMATION_LAYOUTS[saved.formation] ?? FORMATION_LAYOUTS['4-3-3']
+            const hydrated: TeamSlot[] = layout.map((position, idx) => {
+              const savedSlot = saved.slots[idx]
+              const card = savedSlot?.owned_id
+                ? c.find((card) => card.owned_id === savedSlot.owned_id) ?? null
+                : null
+              return { position, card }
+            })
+            setFormation(saved.formation)
+            setSlots(hydrated)
+          } else {
+            setSlots(FORMATION_LAYOUTS['4-3-3'].map((position) => ({ position, card: null })))
+          }
+          setLoading(false)
+        })
       })
     })
   }, [router])
 
-  useEffect(() => {
-    const positions = FORMATION_LAYOUTS[formation]
-    setSlots(positions.map((position) => ({ position, card: null })))
+  // Changer de formation reconstruit les slots à vide pour ce nouveau schéma —
+  // c'est un choix utilisateur explicite (bouton), pas un effet automatique,
+  // pour ne pas écraser l'équipe qu'on vient de recharger depuis la sauvegarde.
+  const handleFormationChange = (f: Formation) => {
+    setFormation(f)
+    setSlots(FORMATION_LAYOUTS[f].map((position) => ({ position, card: null })))
     setActiveSlotIdx(null)
-  }, [formation])
+  }
+
+  const handleSaveTeam = async () => {
+    if (!user) return
+    setSavingTeam(true)
+    setSaveMsg(null)
+    const ok = await saveUserTeam(
+      user.id,
+      formation,
+      slots.map((s) => ({ position: s.position, owned_id: s.card?.owned_id ?? null }))
+    )
+    setSavingTeam(false)
+    ok ? playSuccess() : playError()
+    setSaveMsg(ok ? 'Équipe enregistrée ✓' : "Erreur d'enregistrement")
+    setTimeout(() => setSaveMsg(null), 2500)
+  }
+
+  // ── Craft ──
+  const allStacks = groupOwnedCardsForCraft(cards)
+  const craftableStacks = allStacks.filter(
+    (s) => isUpgradableRarity(s.rarity) && getNextGradeStep(s.rarity, s.grade) !== null
+  )
+  const sellableStacks = getSellableStacks(cards)
+
+  const flashCraft = (text: string, ok: boolean) => {
+    setCraftMsg({ text, ok })
+    setTimeout(() => setCraftMsg(null), 2500)
+  }
+
+  const handleCraft = async (stack: CardStack, step: GradeStep) => {
+    if (!user) return
+    const key = `${stack.baseCardId}__${stack.grade ?? 'null'}`
+    setCraftBusyKey(key)
+    const result = await craftCardUpgrade(user.id, stack.baseCardId, stack.grade, step.next, step.need)
+    if (result.success) {
+      playSuccess()
+      flashCraft(`✨ Carte améliorée en ${gradeSuffix(step.next)} !`, true)
+      const updated = await getUserCollection(user.id)
+      setCards(updated)
+    } else {
+      playError()
+      flashCraft(result.error ?? 'Erreur lors du craft.', false)
+    }
+    setCraftBusyKey(null)
+  }
+
+  const handleSell = async (stack: CardStack, quantity: number | null) => {
+    if (!user) return
+    const key = `sell_${stack.baseCardId}`
+    setCraftBusyKey(key)
+    const result = await sellCardDuplicates(user.id, stack.baseCardId, stack.rarity, quantity)
+    if (result.success) {
+      playCoinGain()
+      flashCraft(`💰 ${result.sold} carte${result.sold! > 1 ? 's' : ''} vendue${result.sold! > 1 ? 's' : ''} pour ${result.gain} ₱ !`, true)
+      const updated = await getUserCollection(user.id)
+      setCards(updated)
+    } else {
+      playError()
+      flashCraft(result.error ?? 'Erreur lors de la vente.', false)
+    }
+    setCraftBusyKey(null)
+  }
 
   // ── Collection computed ──
   const filtered = (() => {
@@ -578,6 +691,79 @@ export default function CollectionPage() {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        .craft-toast {
+          margin: 0 16px 16px;
+          padding: 10px 14px;
+          border-radius: 10px;
+          text-align: center;
+          font-family: 'Rajdhani', sans-serif;
+          font-weight: 700;
+          font-size: 13px;
+        }
+        .craft-toast.ok { background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.3); color: #4ade80; }
+        .craft-toast.error { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.3); color: #f87171; }
+        .craft-list { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+        .craft-item {
+          padding: 12px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .craft-item-card { position: relative; flex-shrink: 0; }
+        .craft-item-count {
+          position: absolute;
+          bottom: -4px;
+          right: -4px;
+          background: #c4a050;
+          color: #0a0e1a;
+          font-family: 'Rajdhani', sans-serif;
+          font-weight: 800;
+          font-size: 11px;
+          padding: 2px 6px;
+          border-radius: 8px;
+          border: 2px solid #0a0e1a;
+        }
+        .craft-item-info { flex: 1; min-width: 0; }
+        .craft-item-name {
+          font-family: 'Rajdhani', sans-serif;
+          font-weight: 700;
+          font-size: 14px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .craft-item-progress {
+          font-family: 'Rajdhani', sans-serif;
+          font-size: 11px;
+          color: var(--text-muted);
+          margin: 3px 0 5px;
+        }
+        .craft-progress-bar {
+          height: 5px;
+          border-radius: 3px;
+          background: rgba(255,255,255,0.08);
+          overflow: hidden;
+        }
+        .craft-progress-fill {
+          height: 100%;
+          background: linear-gradient(90deg, #c4a050, #f6c343);
+          border-radius: 3px;
+          transition: width 0.3s ease;
+        }
+        .craft-btn {
+          flex-shrink: 0;
+          padding: 9px 14px;
+          border-radius: 10px;
+          border: 1px solid rgba(196,160,80,0.4);
+          background: rgba(196,160,80,0.12);
+          color: #c4a050;
+          font-family: 'Rajdhani', sans-serif;
+          font-weight: 700;
+          font-size: 12px;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+        .craft-btn:disabled { opacity: 0.4; cursor: default; }
       `}</style>
 
       {/* ── Tab bar ── */}
@@ -593,6 +779,12 @@ export default function CollectionPage() {
           onClick={() => setActiveTab('equipe')}
         >
           ⚽ Équipe
+        </button>
+        <button
+          className={`col-tab${activeTab === 'craft' ? ' active' : ''}`}
+          onClick={() => setActiveTab('craft')}
+        >
+          🔨 Craft
         </button>
       </div>
 
@@ -709,9 +901,36 @@ export default function CollectionPage() {
         <div className="builder-wrap">
           <div className="builder-header">
             <div className="builder-title">Builder</div>
-            <div>
-              <div className="builder-overall-value">{overall}</div>
-              <div className="builder-overall-label">Overall</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {saveMsg && (
+                <span style={{ fontSize: 12, fontWeight: 600, color: saveMsg.includes('✓') ? '#4ade80' : '#f87171' }}>
+                  {saveMsg}
+                </span>
+              )}
+              <button
+                onClick={handleSaveTeam}
+                disabled={savingTeam || filledCount === 0}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(196,160,80,0.4)',
+                  background: 'rgba(196,160,80,0.12)',
+                  color: '#c4a050',
+                  fontFamily: "'Rajdhani', sans-serif",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                  cursor: savingTeam || filledCount === 0 ? 'default' : 'pointer',
+                  opacity: savingTeam || filledCount === 0 ? 0.5 : 1,
+                }}
+              >
+                {savingTeam ? '…' : 'Enregistrer'}
+              </button>
+              <div>
+                <div className="builder-overall-value">{overall}</div>
+                <div className="builder-overall-label">Overall</div>
+              </div>
             </div>
           </div>
 
@@ -720,7 +939,7 @@ export default function CollectionPage() {
               <button
                 key={f}
                 className={`formation-tab${formation === f ? ' active' : ''}`}
-                onClick={() => setFormation(f)}
+                onClick={() => handleFormationChange(f)}
               >
                 {f}
               </button>
@@ -812,6 +1031,106 @@ export default function CollectionPage() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ════════════════ ONGLET CRAFT ════════════════ */}
+      {activeTab === 'craft' && (
+        <div className="craft-tab">
+          <div className="collection-header">
+            <div className="collection-title-row">
+              <span className="collection-title">Craft</span>
+              <span className="collection-count">Fusionne tes doublons</span>
+            </div>
+          </div>
+
+          {craftMsg && (
+            <div className={`craft-toast ${craftMsg.ok ? 'ok' : 'error'}`}>{craftMsg.text}</div>
+          )}
+
+          {craftableStacks.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">🔨</div>
+              <div className="empty-title">Aucun doublon craftable</div>
+              <div className="empty-desc">
+                Les cartes Basic, Advanced et Elite en double peuvent être fusionnées pour créer une version améliorée (+ / X / Ω). Les cartes Legend, Unique, Cadeau et Rencontre ne se craftent pas.
+              </div>
+            </div>
+          ) : (
+            <div className="craft-list">
+              {craftableStacks.map((stack) => {
+                const sample = stack.cards[0]
+                const step = getNextGradeStep(stack.rarity, stack.grade)
+                const key = `${stack.baseCardId}__${stack.grade ?? 'null'}`
+                if (!step) return null
+                const canCraft = stack.cards.length >= step.need
+                return (
+                  <div key={key} className="craft-item glass-card">
+                    <div className="craft-item-card">
+                      <CardComponent card={sample} size="xs" showStats={false} />
+                      <div className="craft-item-count">×{stack.cards.length}</div>
+                    </div>
+                    <div className="craft-item-info">
+                      <div className="craft-item-name">{sample.name}</div>
+                      <div className="craft-item-progress">
+                        {stack.cards.length} / {step.need} pour {gradeSuffix(step.next) || 'améliorer'}
+                      </div>
+                      <div className="craft-progress-bar">
+                        <div
+                          className="craft-progress-fill"
+                          style={{ width: `${Math.min(100, (stack.cards.length / step.need) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                    <button
+                      className="craft-btn"
+                      disabled={!canCraft || craftBusyKey === key}
+                      onClick={() => handleCraft(stack, step)}
+                    >
+                      {craftBusyKey === key ? '…' : canCraft ? `Craft ${gradeSuffix(step.next)}` : 'Manquant'}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {sellableStacks.length > 0 && (
+            <>
+              <div className="collection-header" style={{ marginTop: 8 }}>
+                <div className="collection-title-row">
+                  <span className="collection-title">💰 Doublons à vendre</span>
+                  <span className="collection-count">Ω déjà obtenue</span>
+                </div>
+              </div>
+              <div className="craft-list">
+                {sellableStacks.map((stack) => {
+                  const sample = stack.cards[0]
+                  const unitPrice = SELL_PRICE[stack.rarity] ?? 0
+                  const key = `sell_${stack.baseCardId}`
+                  return (
+                    <div key={key} className="craft-item glass-card">
+                      <div className="craft-item-card">
+                        <CardComponent card={sample} size="xs" showStats={false} />
+                        <div className="craft-item-count">×{stack.cards.length}</div>
+                      </div>
+                      <div className="craft-item-info">
+                        <div className="craft-item-name">{sample.name}</div>
+                        <div className="craft-item-progress">{unitPrice} ₱ / carte</div>
+                      </div>
+                      <button
+                        className="craft-btn"
+                        disabled={craftBusyKey === key}
+                        onClick={() => handleSell(stack, null)}
+                      >
+                        {craftBusyKey === key ? '…' : `Tout vendre (${stack.cards.length * unitPrice} ₱)`}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
         </div>
       )}
     </>

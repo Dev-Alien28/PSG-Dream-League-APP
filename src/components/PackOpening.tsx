@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import type { OwnedCard } from '@/types/card'
 import CardComponent from './Card'
 import { RARITY_COLORS } from '@/lib/cardHelpers'
+import { playClick, playCardReveal } from '@/lib/soundEngine'
 
 interface PackOpeningProps {
   packName: string
@@ -22,6 +23,7 @@ export default function PackOpening({ packName, packImage, cards, onClose }: Pac
 
   const handlePackTap = () => {
     if (phase !== 'idle') return
+    playClick()
     setPhase('shake')
     shakeTimeout.current = setTimeout(() => {
       setPhase('burst')
@@ -35,6 +37,7 @@ export default function PackOpening({ packName, packImage, cards, onClose }: Pac
   const handleCardTap = (index: number) => {
     if (phase !== 'reveal') return
     if (!flipped[index]) {
+      playCardReveal(cards[index]?.rarity ?? 'Basic')
       setFlipped((prev) => {
         const next = [...prev]
         next[index] = true
@@ -54,6 +57,9 @@ export default function PackOpening({ packName, packImage, cards, onClose }: Pac
     setFlipped(new Array(cards.length).fill(true))
     setRevealedIndex(cards.length - 1)
     setPhase('done')
+    const rarityRank = ['Basic', 'Advanced', 'Elite', 'Legend', 'Unique', 'Give', 'Encounter']
+    const best = cards.reduce((acc, c) => (rarityRank.indexOf(c.rarity) > rarityRank.indexOf(acc) ? c.rarity : acc), 'Basic')
+    playCardReveal(best)
   }
 
   return (

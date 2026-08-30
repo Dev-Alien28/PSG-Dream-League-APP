@@ -5,6 +5,8 @@
     "collection": "Collezione",
     "equipe": "Squadra",
     "match": "Partita",
+    "tournoi": "Torneo",
+    "boutique": "Negozio",
     "histoire": "Storia",
     "config": "Impostazioni"
   },
@@ -80,7 +82,7 @@
     "title": "Impostazioni",
     "pseudo": "Nome utente",
     "change_pseudo": "Cambia nome",
-    "pseudo_cost": "Costo: 50 PSG Coins",
+    "pseudo_cost": "Costo: 200 PSG Coins",
     "avatar": "Foto profilo",
     "languages": "Lingue",
     "sound": "Volume audio",

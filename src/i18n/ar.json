@@ -5,6 +5,8 @@
     "collection": "مجموعة",
     "equipe": "الفريق",
     "match": "مباراة",
+    "tournoi": "البطولة",
+    "boutique": "المتجر",
     "histoire": "القصة",
     "config": "الإعدادات"
   },
@@ -80,7 +82,7 @@
     "title": "الإعدادات",
     "pseudo": "اسم المستخدم",
     "change_pseudo": "تغيير الاسم",
-    "pseudo_cost": "التكلفة: 50 PSG Coins",
+    "pseudo_cost": "التكلفة: 200 PSG Coins",
     "avatar": "صورة الملف الشخصي",
     "languages": "اللغات",
     "sound": "مستوى الصوت",

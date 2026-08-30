@@ -1,5 +1,5 @@
 // src/app/layout.tsx
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Rajdhani } from 'next/font/google'
 import './globals.css'
 import Navbar from '@/components/Navbar'
@@ -15,8 +15,6 @@ export const metadata: Metadata = {
   title: 'PSG Dream League',
   description: 'La fan app non officielle du Paris Saint-Germain',
   manifest: '/manifest.json',
-  themeColor: '#0a0e1a',
-  viewport: 'width=device-width, initial-scale=1, viewport-fit=cover',
   icons: {
     icon: [
       { url: '/icons/icon-32x32.png', sizes: '32x32', type: 'image/png' },
@@ -27,6 +25,13 @@ export const metadata: Metadata = {
       { url: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
     ],
   },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#0a0e1a',
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

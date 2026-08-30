@@ -17,6 +17,10 @@ export type User = {
   primary_language: Language
   secondary_languages: Language[]
   created_at: string
+  boost_expires_at: string | null
+  unlocked_colors: string[]
+  selected_color: string
+  pity_legend: number
 }
 
 export type UserProfile = User & {

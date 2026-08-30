@@ -9,8 +9,11 @@ import {
   updateUserPseudo,
   updateUserAvatar,
   updateUserLanguages,
+  incrementUserCoins,
 } from '@/lib/supabase'
 import { spendCoinsForPseudoChange, COIN_COSTS } from '@/lib/coinEngine'
+import { TEAM_COLOR_PALETTE } from '@/lib/shopData'
+import { getVolume, setVolume, playClick } from '@/lib/soundEngine'
 import CoinDisplay from '@/components/CoinDisplay'
 import { useTranslation, setAppLanguage } from '@/i18n/useTranslation'
 import type { User, Language } from '@/types/user'
@@ -37,9 +40,11 @@ export default function ConfigPage() {
   const [secondaryLangs, setSecondaryLangs] = useState<Language[]>([])
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ text: string; type: 'ok' | 'error' } | null>(null)
+  const [volume, setVolumeState] = useState(0.6)
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    setVolumeState(getVolume())
     getCurrentUser().then((u) => {
       if (!u) { router.replace('/login'); return }
       setUser(u)
@@ -65,14 +70,19 @@ export default function ConfigPage() {
       return
     }
     const updated = await updateUserPseudo(user.id, pseudoEdit.trim())
-    setSaving(false)
     if (updated) {
+      setSaving(false)
       setUser((prev) => prev ? { ...prev, pseudo: pseudoEdit.trim() } : prev)
       setCoins((prev) => prev - COIN_COSTS.CHANGE_PSEUDO)
       showMsg('Pseudo mis à jour !', 'ok')
       setEditingPseudo(false)
     } else {
-      showMsg('Erreur lors de la mise à jour.', 'error')
+      // ⚠️ Les coins avaient déjà été débités même si la mise à jour du pseudo
+      // échouait ensuite (ex: pseudo déjà pris) — on les rembourse pour ne pas
+      // faire perdre 200 ₱ pour rien.
+      await incrementUserCoins(user.id, COIN_COSTS.CHANGE_PSEUDO)
+      setSaving(false)
+      showMsg('Erreur lors de la mise à jour, coins remboursés.', 'error')
     }
   }
 
@@ -160,7 +170,8 @@ export default function ConfigPage() {
           height: 80px;
           border-radius: 50%;
           overflow: hidden;
-          border: 2px solid rgba(196,160,80,0.4);
+          border: 3px solid var(--team-color, rgba(196,160,80,0.4));
+          box-shadow: 0 0 16px var(--team-color-glow, transparent);
           background: linear-gradient(135deg, #001a5e30, #c4a05015);
           display: flex;
           align-items: center;
@@ -224,6 +235,50 @@ export default function ConfigPage() {
           border: 1px solid var(--border-subtle);
           border-radius: 14px;
           overflow: hidden;
+        }
+        .sound-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 16px;
+        }
+        .sound-icon { font-size: 20px; flex-shrink: 0; width: 24px; text-align: center; }
+        .sound-slider {
+          flex: 1;
+          -webkit-appearance: none;
+          appearance: none;
+          height: 5px;
+          border-radius: 3px;
+          background: rgba(255,255,255,0.1);
+          outline: none;
+        }
+        .sound-slider::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: #c4a050;
+          cursor: pointer;
+          box-shadow: 0 0 8px rgba(196,160,80,0.6);
+        }
+        .sound-slider::-moz-range-thumb {
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: #c4a050;
+          border: none;
+          cursor: pointer;
+          box-shadow: 0 0 8px rgba(196,160,80,0.6);
+        }
+        .sound-pct {
+          font-family: 'Rajdhani', sans-serif;
+          font-weight: 700;
+          font-size: 13px;
+          color: #c4a050;
+          width: 40px;
+          text-align: right;
+          flex-shrink: 0;
         }
         .settings-row {
           display: flex;
@@ -360,7 +415,13 @@ export default function ConfigPage() {
 
         <div className="profile-section">
           <div className="avatar-wrap" onClick={() => fileRef.current?.click()}>
-            <div className="avatar-circle">
+            <div
+              className="avatar-circle"
+              style={{
+                ['--team-color' as string]: TEAM_COLOR_PALETTE[user.selected_color ?? 'rouge']?.hex ?? '#c4a050',
+                ['--team-color-glow' as string]: `${TEAM_COLOR_PALETTE[user.selected_color ?? 'rouge']?.hex ?? '#c4a050'}55`,
+              }}
+            >
               {user.avatar_url
                 ? <img src={user.avatar_url} alt={user.pseudo} />
                 : initials
@@ -410,6 +471,29 @@ export default function ConfigPage() {
                 <div className="pseudo-cost-note">{t('config.pseudo_cost')}</div>
               </div>
             )}
+          </div>
+
+          {/* Son */}
+          <div className="settings-section-label">{t('config.sound')}</div>
+          <div className="settings-card">
+            <div className="sound-row">
+              <span className="sound-icon">{volume === 0 ? '🔇' : volume < 0.5 ? '🔉' : '🔊'}</span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round(volume * 100)}
+                onChange={(e) => {
+                  const v = Number(e.target.value) / 100
+                  setVolumeState(v)
+                  setVolume(v)
+                }}
+                onMouseUp={() => playClick()}
+                onTouchEnd={() => playClick()}
+                className="sound-slider"
+              />
+              <span className="sound-pct">{Math.round(volume * 100)}%</span>
+            </div>
           </div>
 
           {/* Langues */}
