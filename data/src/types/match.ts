@@ -6,6 +6,16 @@ export type Formation =
   | '4-2-3-1'
   | '3-5-2'
   | '5-3-2'
+  // ── Compositions premium (achetables en Boutique) ──
+  | '3-2-5'
+  | '2-3-5'
+  | '3-3-4'
+  | '3-4-3'
+  | '5-2-3'
+  | '5-4-1'
+  | '4-1-5'
+  | '2-4-4'
+  | '3-6-1'
 
 export type TeamSlot = {
   position: PlayerPosition

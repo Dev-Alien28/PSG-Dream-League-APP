@@ -8,7 +8,38 @@ import type { MatchResult, Formation } from '@/types/match'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// ⚠️ Avant : la case "Se souvenir de moi" du login écrivait bien un flag
+// (`psg_remember_me`) mais rien ne le lisait jamais — le client Supabase par
+// défaut persiste TOUJOURS la session dans localStorage, donc décocher la
+// case n'avait strictement aucun effet. Cet adaptateur de stockage route
+// réellement vers sessionStorage (effacé à la fermeture du navigateur)
+// quand l'utilisateur ne veut pas être mémorisé.
+const rememberAwareStorage = {
+  getItem: (key: string) => {
+    if (typeof window === 'undefined') return null
+    return sessionStorage.getItem(key) ?? localStorage.getItem(key)
+  },
+  setItem: (key: string, value: string) => {
+    if (typeof window === 'undefined') return
+    const remember = localStorage.getItem('psg_remember_me') === '1'
+    if (remember) {
+      localStorage.setItem(key, value)
+      sessionStorage.removeItem(key)
+    } else {
+      sessionStorage.setItem(key, value)
+      localStorage.removeItem(key)
+    }
+  },
+  removeItem: (key: string) => {
+    if (typeof window === 'undefined') return
+    localStorage.removeItem(key)
+    sessionStorage.removeItem(key)
+  },
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: { storage: rememberAwareStorage },
+})
 
 // ─── USER ─────────────────────────────────────────────────────────────────────
 
@@ -239,6 +270,32 @@ export async function rewardChatMessageServer(userId: string): Promise<number> {
   return data.amount ?? 0
 }
 
+/**
+ * Réclame un jalon (achievement) — n'accorde la carte Cadeau que si ce jalon
+ * n'a jamais été réclamé par ce joueur. Atomique côté serveur pour éviter
+ * tout double-gain (voir supabase_migration_milestones.sql).
+ */
+export async function claimMilestone(
+  userId: string,
+  milestoneKey: string,
+  cardId: string
+): Promise<{ success: boolean; error?: string }> {
+  const { data, error } = await supabase.rpc('claim_milestone', {
+    p_user_id: userId,
+    p_milestone_key: milestoneKey,
+    p_card_id: cardId,
+  })
+
+  if (error) {
+    console.error('[supabase] claimMilestone:', error.message)
+    return { success: false, error: 'Erreur serveur.' }
+  }
+  if (!data?.success) {
+    return { success: false, error: data?.error }
+  }
+  return { success: true }
+}
+
 // ─── ÉQUIPE ───────────────────────────────────────────────────────────────────
 // Nécessite la table `user_teams` — voir supabase_migration_user_teams.sql à la
 // racine du projet pour la créer dans Supabase (SQL Editor).
@@ -368,6 +425,47 @@ export async function setPityLegend(userId: string, value: number): Promise<bool
 
   if (error) {
     console.error('[supabase] setPityLegend:', error.message)
+    return false
+  }
+  return true
+}
+
+export async function unlockFormation(userId: string, formationKey: string, currentUnlocked: string[]): Promise<boolean> {
+  const updated = Array.from(new Set([...currentUnlocked, formationKey]))
+  const { error } = await supabase
+    .from('profiles')
+    .update({ unlocked_formations: updated })
+    .eq('id', userId)
+
+  if (error) {
+    console.error('[supabase] unlockFormation:', error.message)
+    return false
+  }
+  return true
+}
+
+export async function unlockAffiche(userId: string, afficheKey: string, currentUnlocked: string[]): Promise<boolean> {
+  const updated = Array.from(new Set([...currentUnlocked, afficheKey]))
+  const { error } = await supabase
+    .from('profiles')
+    .update({ unlocked_affiches: updated })
+    .eq('id', userId)
+
+  if (error) {
+    console.error('[supabase] unlockAffiche:', error.message)
+    return false
+  }
+  return true
+}
+
+export async function setSelectedAffiche(userId: string, afficheKey: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ selected_affiche: afficheKey })
+    .eq('id', userId)
+
+  if (error) {
+    console.error('[supabase] setSelectedAffiche:', error.message)
     return false
   }
   return true

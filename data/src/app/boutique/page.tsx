@@ -9,12 +9,17 @@ import {
   isCoinBoostActive,
   unlockTeamColor,
   setSelectedTeamColor,
+  unlockFormation,
+  unlockAffiche,
+  setSelectedAffiche,
   getUserCollection,
   addCardToCollection,
 } from '@/lib/supabase'
 import { spendCoins, hasEnoughCoins } from '@/lib/coinEngine'
-import { BOOST_ITEMS, PACK_RESET_ITEM, TEAM_COLOR_PALETTE } from '@/lib/shopData'
+import { BOOST_ITEMS, PACK_RESET_ITEM, TEAM_COLOR_PALETTE, AFFICHE_CATALOG } from '@/lib/shopData'
+import { PREMIUM_FORMATIONS, FORMATION_DEFS } from '@/lib/formationData'
 import { playCoinGain, playError, playSuccess } from '@/lib/soundEngine'
+import { tryClaimMilestone } from '@/lib/milestones'
 import CoinDisplay from '@/components/CoinDisplay'
 import type { User } from '@/types/user'
 import encounterCards from '../../../data/packs/pack_encounter.json'
@@ -31,7 +36,7 @@ interface EncounterCard {
   questions: EncounterQuestion[]
 }
 
-type Tab = 'boosts' | 'couleurs' | 'rencontre'
+type Tab = 'boosts' | 'couleurs' | 'rencontre' | 'compos' | 'affiches'
 
 export default function BoutiquePage() {
   const router = useRouter()
@@ -40,6 +45,9 @@ export default function BoutiquePage() {
   const [tab, setTab] = useState<Tab>('boosts')
   const [boostActive, setBoostActive] = useState(false)
   const [unlockedColors, setUnlockedColors] = useState<string[]>(['rouge', 'bleu'])
+  const [unlockedFormations, setUnlockedFormations] = useState<string[]>([])
+  const [unlockedAffiches, setUnlockedAffiches] = useState<string[]>(['defaut'])
+  const [selectedAffiche, setSelectedAffiche_] = useState('defaut')
   const [selectedColor, setSelectedColor] = useState('rouge')
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null)
@@ -58,6 +66,9 @@ export default function BoutiquePage() {
       setUser(u)
       setCoins(u.coins)
       setUnlockedColors(u.unlocked_colors ?? ['rouge', 'bleu'])
+      setUnlockedFormations(u.unlocked_formations ?? [])
+      setUnlockedAffiches(u.unlocked_affiches ?? ['defaut'])
+      setSelectedAffiche_(u.selected_affiche ?? 'defaut')
       setSelectedColor(u.selected_color ?? 'rouge')
       setBoostActive(await isCoinBoostActive(u.id))
 
@@ -98,6 +109,14 @@ export default function BoutiquePage() {
       await addCardToCollection(user.id, currentEncounter.id, 'pack_encounter')
       const updatedOwned = [...ownedEncounterIds, currentEncounter.id]
       setOwnedEncounterIds(updatedOwned)
+
+      if (updatedOwned.length === (encounterCards as unknown as EncounterCard[]).length) {
+        const milestone = await tryClaimMilestone(user.id, 'all_encounters', user.claimed_milestones ?? [])
+        if (milestone.unlocked) {
+          flash(`🎁 Jalon débloqué : Toutes les rencontres ! Carte Cadeau reçue — ${milestone.cardName}`, true)
+        }
+      }
+
       setTimeout(() => {
         setEncounterBusy(false)
         pickNewEncounter(updatedOwned)
@@ -204,6 +223,81 @@ export default function BoutiquePage() {
     if (!user || !unlockedList.includes(colorKey)) return
     setSelectedColor(colorKey)
     await setSelectedTeamColor(user.id, colorKey)
+  }
+
+  const handleBuyFormation = async (formationKey: string) => {
+    if (!user) return
+    const def = FORMATION_DEFS[formationKey as keyof typeof FORMATION_DEFS]
+    const prix = def.prix ?? 150
+    setBusyKey(formationKey)
+
+    const ok = await hasEnoughCoins(user.id, prix)
+    if (!ok) {
+      flash(`Il te faut ${prix} \u20B1 pour cette composition.`, false)
+      setBusyKey(null)
+      return
+    }
+    const spent = await spendCoins(user.id, prix)
+    if (!spent) {
+      flash(`Il te faut ${prix} \u20B1 pour cette composition.`, false)
+      setBusyKey(null)
+      return
+    }
+    const unlocked = await unlockFormation(user.id, formationKey, unlockedFormations)
+    if (!unlocked) {
+      const { incrementUserCoins } = await import('@/lib/supabase')
+      await incrementUserCoins(user.id, prix)
+      flash("Erreur lors de l'achat, coins remboursés.", false)
+      setBusyKey(null)
+      return
+    }
+    setUnlockedFormations((prev) => Array.from(new Set([...prev, formationKey])))
+    setCoins((prev) => prev - prix)
+    flash(`${def.emoji} Composition ${def.label} débloquée ! Sélectionne-la dans Collection > Équipe.`, true)
+    setBusyKey(null)
+  }
+
+  const handleBuyAffiche = async (key: string) => {
+    if (!user) return
+    const def = AFFICHE_CATALOG[key]
+    setBusyKey(key)
+
+    if (def.prix > 0) {
+      const ok = await hasEnoughCoins(user.id, def.prix)
+      if (!ok) {
+        flash(`Il te faut ${def.prix} \u20B1 pour cette affiche.`, false)
+        setBusyKey(null)
+        return
+      }
+      const spent = await spendCoins(user.id, def.prix)
+      if (!spent) {
+        flash(`Il te faut ${def.prix} \u20B1 pour cette affiche.`, false)
+        setBusyKey(null)
+        return
+      }
+    }
+    const unlocked = await unlockAffiche(user.id, key, unlockedAffiches)
+    if (!unlocked) {
+      if (def.prix > 0) {
+        const { incrementUserCoins } = await import('@/lib/supabase')
+        await incrementUserCoins(user.id, def.prix)
+      }
+      flash("Erreur lors de l'achat, coins remboursés.", false)
+      setBusyKey(null)
+      return
+    }
+    const updatedUnlocked = Array.from(new Set([...unlockedAffiches, key]))
+    setUnlockedAffiches(updatedUnlocked)
+    if (def.prix > 0) setCoins((prev) => prev - def.prix)
+    await handleSelectAffiche(key, updatedUnlocked)
+    flash(`${def.emoji} Affiche ${def.nom} débloquée !`, true)
+    setBusyKey(null)
+  }
+
+  const handleSelectAffiche = async (key: string, unlockedList = unlockedAffiches) => {
+    if (!user || !unlockedList.includes(key)) return
+    setSelectedAffiche_(key)
+    await setSelectedAffiche(user.id, key)
   }
 
   if (!user) {
@@ -411,6 +505,8 @@ export default function BoutiquePage() {
           <button className={`shop-tab${tab === 'boosts' ? ' active' : ''}`} onClick={() => setTab('boosts')}>⚡ Boosts</button>
           <button className={`shop-tab${tab === 'couleurs' ? ' active' : ''}`} onClick={() => setTab('couleurs')}>🎨 Couleurs</button>
           <button className={`shop-tab${tab === 'rencontre' ? ' active' : ''}`} onClick={() => setTab('rencontre')}>🎤 Rencontre</button>
+          <button className={`shop-tab${tab === 'compos' ? ' active' : ''}`} onClick={() => setTab('compos')}>🎯 Compos</button>
+          <button className={`shop-tab${tab === 'affiches' ? ' active' : ''}`} onClick={() => setTab('affiches')}>🖼️ Affiches</button>
         </div>
 
         {tab === 'boosts' && (
@@ -516,6 +612,57 @@ export default function BoutiquePage() {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {tab === 'compos' && (
+          <div className="compos-list">
+            {PREMIUM_FORMATIONS.map((key) => {
+              const def = FORMATION_DEFS[key]
+              const owned = unlockedFormations.includes(key)
+              return (
+                <div key={key} className="shop-item glass-card">
+                  <div className="shop-item-icon">{def.emoji}</div>
+                  <div style={{ flex: 1 }}>
+                    <div className="shop-item-name">{def.label} — {def.styleLabel}</div>
+                    <div className="shop-item-desc">{def.description}</div>
+                  </div>
+                  <button
+                    className="shop-buy-btn"
+                    disabled={owned || busyKey === key}
+                    onClick={() => handleBuyFormation(key)}
+                  >
+                    {owned ? 'Débloquée ✓' : busyKey === key ? '…' : `${def.prix} \u20B1`}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {tab === 'affiches' && (
+          <div className="shop-colors-grid">
+            {Object.entries(AFFICHE_CATALOG).map(([key, def]) => {
+              const owned = unlockedAffiches.includes(key)
+              const isSelected = selectedAffiche === key
+              return (
+                <div
+                  key={key}
+                  className={`shop-color-card${isSelected ? ' selected' : ''}`}
+                  style={{
+                    ['--dot' as string]: '#c4a050',
+                    background: def.gradient,
+                  }}
+                  onClick={() => (owned ? handleSelectAffiche(key) : handleBuyAffiche(key))}
+                >
+                  {isSelected && <span className="shop-color-selected-badge">✓</span>}
+                  <div className="shop-color-name">{def.emoji} {def.nom}</div>
+                  <div className="shop-color-price">
+                    {busyKey === key ? '…' : owned ? (isSelected ? 'Sélectionnée' : 'Choisir') : `${def.prix} \u20B1`}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
       </div>

@@ -14,16 +14,9 @@ import {
 import { simulateMatch as runMatch } from '@/lib/matchEngine'
 import { computeTeamOverall } from '@/lib/cardHelpers'
 import type { ChapterData } from '@/lib/storyEngine'
-import type { OwnedCard, PlayerPosition } from '@/types/card'
+import type { OwnedCard } from '@/types/card'
 import type { Formation, TeamSlot, MatchResult } from '@/types/match'
-
-const FORMATION_LAYOUTS: Record<Formation, PlayerPosition[]> = {
-  '4-3-3': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant', 'Attaquant'],
-  '4-4-2': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant'],
-  '4-2-3-1': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Attaquant'],
-  '3-5-2': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant'],
-  '5-3-2': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant'],
-}
+import { FORMATION_LAYOUTS } from '@/lib/formationData'
 
 type Phase = 'loading' | 'locked' | 'intro' | 'select_team' | 'in_progress' | 'result'
 

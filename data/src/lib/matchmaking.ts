@@ -2,6 +2,7 @@
 
 import { supabase } from './supabase'
 import { computeTeamOverall } from './cardHelpers'
+import { FORMATION_LAYOUTS } from './formationData'
 import type { Team, Formation } from '@/types/match'
 import type { OwnedCard, PlayerPosition } from '@/types/card'
 
@@ -235,14 +236,6 @@ function buildSlotsFromFormation(formation: Formation, overall: number) {
     position,
     card: generateBotCard(position, overall),
   }))
-}
-
-const FORMATION_LAYOUTS: Record<Formation, PlayerPosition[]> = {
-  '4-3-3': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant', 'Attaquant'],
-  '4-4-2': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant'],
-  '4-2-3-1': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Attaquant'],
-  '3-5-2': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant'],
-  '5-3-2': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant'],
 }
 
 // ─── UTILS ────────────────────────────────────────────────────────────────────

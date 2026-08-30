@@ -3,6 +3,7 @@
 import { v4 as uuidv4 } from 'uuid'
 import type { Team, MatchResult, MatchEvent } from '@/types/match'
 import type { OwnedCard } from '@/types/card'
+import { FORMATION_DEFS } from './formationData'
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -24,7 +25,18 @@ function getPlayerCards(team: Team): OwnedCard[] {
 }
 
 /**
- * Calcule l'overall offensif : attaquants + milieux pondérés.
+ * Bonus tactique de la formation — voir formationData.ts. Le bonus "milieu"
+ * est reversé à 35% sur l'attaque, dans les mêmes proportions que le poids
+ * des milieux dans getAttackRating (ce moteur n'a pas de rating milieu
+ * dédié, donc on garde ce même mélange plutôt que d'ajouter un 3e canal).
+ */
+function getFormationBonus(team: Team) {
+  const def = FORMATION_DEFS[team.formation]
+  return def?.bonus ?? { attaque: 0, milieu: 0, defense: 0 }
+}
+
+/**
+ * Calcule l'overall offensif : attaquants + milieux pondérés + bonus de formation.
  */
 function getAttackRating(team: Team): number {
   const players = getPlayerCards(team)
@@ -38,11 +50,12 @@ function getAttackRating(team: Team): number {
     ? midfielders.reduce((s, c) => s + c.stats.overall, 0) / midfielders.length
     : 50
 
-  return attAvg * 0.65 + midAvg * 0.35
+  const bonus = getFormationBonus(team)
+  return attAvg * 0.65 + midAvg * 0.35 + bonus.attaque + bonus.milieu * 0.35
 }
 
 /**
- * Calcule l'overall défensif : défenseurs + gardien pondérés.
+ * Calcule l'overall défensif : défenseurs + gardien pondérés + bonus de formation.
  */
 function getDefenseRating(team: Team): number {
   const players = getPlayerCards(team)
@@ -56,7 +69,8 @@ function getDefenseRating(team: Team): number {
     ? goalkeepers.reduce((s, c) => s + c.stats.overall, 0) / goalkeepers.length
     : 50
 
-  return defAvg * 0.6 + gkAvg * 0.4
+  const bonus = getFormationBonus(team)
+  return defAvg * 0.6 + gkAvg * 0.4 + bonus.defense
 }
 
 // ─── SIMULATION ───────────────────────────────────────────────────────────────

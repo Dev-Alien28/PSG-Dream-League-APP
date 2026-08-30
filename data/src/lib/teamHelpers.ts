@@ -7,14 +7,9 @@
 import type { OwnedCard, PlayerPosition } from '@/types/card'
 import type { Formation, Team, TeamSlot } from '@/types/match'
 import { getUserTeam } from './supabase'
+import { FORMATION_LAYOUTS } from './formationData'
 
-export const FORMATION_LAYOUTS: Record<Formation, PlayerPosition[]> = {
-  '4-3-3': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant', 'Attaquant'],
-  '4-4-2': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant'],
-  '4-2-3-1': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Attaquant'],
-  '3-5-2': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant'],
-  '5-3-2': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant'],
-}
+export { FORMATION_LAYOUTS }
 
 /**
  * Construit automatiquement la meilleure équipe possible (par overall) à

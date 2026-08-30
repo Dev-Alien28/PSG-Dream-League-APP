@@ -21,6 +21,10 @@ export type User = {
   unlocked_colors: string[]
   selected_color: string
   pity_legend: number
+  claimed_milestones: string[]
+  unlocked_formations: string[]
+  unlocked_affiches: string[]
+  selected_affiche: string
 }
 
 export type UserProfile = User & {

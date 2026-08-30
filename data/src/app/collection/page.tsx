@@ -28,6 +28,9 @@ import type { OwnedCard, CardRarity, CardCategory, PlayerPosition } from '@/type
 import type { Formation, TeamSlot } from '@/types/match'
 import type { User } from '@/types/user'
 import { playSuccess, playError, playCoinGain } from '@/lib/soundEngine'
+import { tryClaimMilestone } from '@/lib/milestones'
+import { FORMATION_LAYOUTS, FORMATION_DEFS, FREE_FORMATIONS, PREMIUM_FORMATIONS } from '@/lib/formationData'
+import { AFFICHE_CATALOG } from '@/lib/shopData'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type SortMode = 'overall' | 'rarity' | 'name'
@@ -36,15 +39,7 @@ type FilterCategory = CardCategory | 'all'
 type Tab = 'cartes' | 'equipe' | 'craft'
 
 // ─── Builder constants ────────────────────────────────────────────────────────
-const FORMATIONS: Formation[] = ['4-3-3', '4-4-2', '4-2-3-1', '3-5-2', '5-3-2']
-
-const FORMATION_LAYOUTS: Record<Formation, PlayerPosition[]> = {
-  '4-3-3': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant', 'Attaquant'],
-  '4-4-2': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant'],
-  '4-2-3-1': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Attaquant'],
-  '3-5-2': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant'],
-  '5-3-2': ['Gardien', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Défenseur', 'Milieu', 'Milieu', 'Milieu', 'Attaquant', 'Attaquant'],
-}
+const FORMATIONS: Formation[] = [...FREE_FORMATIONS, ...PREMIUM_FORMATIONS]
 
 const POSITION_SHORT: Record<PlayerPosition, string> = {
   Gardien: 'GK',
@@ -94,6 +89,8 @@ function CollectionPageInner() {
   const [activeSlotIdx, setActiveSlotIdx] = useState<number | null>(null)
   const [savingTeam, setSavingTeam] = useState(false)
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
+  const [unlockedFormations, setUnlockedFormations] = useState<string[]>(FREE_FORMATIONS)
+  const [formationLockMsg, setFormationLockMsg] = useState<string | null>(null)
 
   // ── Craft state ──
   const [craftBusyKey, setCraftBusyKey] = useState<string | null>(null)
@@ -103,6 +100,7 @@ function CollectionPageInner() {
     getCurrentUser().then((u) => {
       if (!u) { router.replace('/login'); return }
       setUser(u)
+      setUnlockedFormations(u.unlocked_formations ?? FREE_FORMATIONS)
       getUserCollection(u.id).then((c) => {
         setCards(c)
         // ⚠️ Avant : l'équipe du builder n'était jamais sauvegardée nulle part,
@@ -176,6 +174,17 @@ function CollectionPageInner() {
       flashCraft(`✨ Carte améliorée en ${gradeSuffix(step.next)} !`, true)
       const updated = await getUserCollection(user.id)
       setCards(updated)
+
+      if (step.next === 'omega') {
+        const milestone = await tryClaimMilestone(user.id, 'first_omega', user.claimed_milestones ?? [])
+        if (milestone.unlocked) {
+          setUser((prev) => prev ? { ...prev, claimed_milestones: [...(prev.claimed_milestones ?? []), 'first_omega'] } : prev)
+          setTimeout(() => {
+            playSuccess()
+            flashCraft(`🎁 Jalon débloqué : Premier Ω ! Carte Cadeau reçue — ${milestone.cardName}`, true)
+          }, 800)
+        }
+      }
     } else {
       playError()
       flashCraft(result.error ?? 'Erreur lors du craft.', false)
@@ -504,6 +513,32 @@ function CollectionPageInner() {
           background: rgba(196,160,80,0.12);
           border-color: rgba(196,160,80,0.35);
           color: #c4a050;
+        }
+        .formation-tab.locked {
+          opacity: 0.55;
+        }
+        .formation-lock-toast {
+          margin: 0 16px 10px;
+          padding: 10px 14px;
+          border-radius: 10px;
+          background: rgba(248,113,113,0.1);
+          border: 1px solid rgba(248,113,113,0.3);
+          color: #f87171;
+          font-family: 'Rajdhani', sans-serif;
+          font-weight: 600;
+          font-size: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+        }
+        .formation-lock-close {
+          background: none;
+          border: none;
+          color: #f87171;
+          font-weight: 800;
+          cursor: pointer;
+          flex-shrink: 0;
         }
         .field-area {
           flex: 1;
@@ -935,16 +970,26 @@ function CollectionPageInner() {
           </div>
 
           <div className="formation-tabs">
-            {FORMATIONS.map((f) => (
-              <button
-                key={f}
-                className={`formation-tab${formation === f ? ' active' : ''}`}
-                onClick={() => handleFormationChange(f)}
-              >
-                {f}
-              </button>
-            ))}
+            {FORMATIONS.map((f) => {
+              const isPremium = FORMATION_DEFS[f].premium
+              const isUnlocked = !isPremium || unlockedFormations.includes(f)
+              return (
+                <button
+                  key={f}
+                  className={`formation-tab${formation === f ? ' active' : ''}${!isUnlocked ? ' locked' : ''}`}
+                  onClick={() => (isUnlocked ? handleFormationChange(f) : setFormationLockMsg(f))}
+                >
+                  {!isUnlocked && '🔒 '}{f}
+                </button>
+              )
+            })}
           </div>
+          {formationLockMsg && (
+            <div className="formation-lock-toast">
+              🔒 Composition {formationLockMsg} verrouillée — débloque-la en Boutique (150 ₱)
+              <button className="formation-lock-close" onClick={() => setFormationLockMsg(null)}>✕</button>
+            </div>
+          )}
 
           <div className="progress-bar-wrap">
             <div className="progress-bar-label">
@@ -957,7 +1002,10 @@ function CollectionPageInner() {
           </div>
 
           <div className="field-area">
-            <div className="field-bg" />
+            <div
+              className="field-bg"
+              style={{ background: AFFICHE_CATALOG[user?.selected_affiche ?? 'defaut']?.gradient }}
+            />
             <svg className="field-lines-svg" viewBox="0 0 400 320" preserveAspectRatio="none">
               <rect x="100" y="260" width="200" height="50" fill="none" stroke="white" strokeWidth="1.5"/>
               <ellipse cx="200" cy="200" rx="50" ry="30" fill="none" stroke="white" strokeWidth="1"/>

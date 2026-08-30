@@ -17,6 +17,12 @@ export interface RegisterPayload {
 export async function register(payload: RegisterPayload): Promise<{ user: User | null; error: string | null }> {
   const { email, password, pseudo, primaryLanguage, secondaryLanguages } = payload
 
+  // Pas de case "se souvenir de moi" sur l'inscription — on mémorise par défaut,
+  // comme la plupart des apps le font après une création de compte.
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('psg_remember_me', '1')
+  }
+
   // 1. Créer le compte Auth Supabase (le trigger handle_new_user crée le profil automatiquement)
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
@@ -60,16 +66,20 @@ export async function login(
   password: string,
   rememberMe: boolean = false
 ): Promise<{ user: User | null; error: string | null }> {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-
-  if (error || !data.user) {
-    return { user: null, error: error?.message ?? 'Email ou mot de passe incorrect.' }
-  }
-
+  // ⚠️ Le flag doit être écrit AVANT signInWithPassword : c'est cet appel qui
+  // déclenche l'écriture du token de session par le client Supabase, et
+  // l'adaptateur de stockage (voir supabase.ts) lit ce flag à ce moment-là
+  // pour savoir où persister le token.
   if (rememberMe) {
     localStorage.setItem('psg_remember_me', '1')
   } else {
     localStorage.removeItem('psg_remember_me')
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+
+  if (error || !data.user) {
+    return { user: null, error: error?.message ?? 'Email ou mot de passe incorrect.' }
   }
 
   const { data: userData, error: userError } = await supabase

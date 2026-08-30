@@ -12,6 +12,7 @@ import { rewardTournamentRound, rewardTournamentChampion, COIN_REWARDS } from '@
 import { computeTeamOverall } from '@/lib/cardHelpers'
 import { TEAM_COLOR_PALETTE } from '@/lib/shopData'
 import { playWhistle, playVictory, playDefeat, playClick } from '@/lib/soundEngine'
+import { tryClaimMilestone } from '@/lib/milestones'
 import CoinDisplay from '@/components/CoinDisplay'
 import type { User } from '@/types/user'
 import type { Team, MatchResult } from '@/types/match'
@@ -39,6 +40,7 @@ export default function TournoiPage() {
   const [roundIndex, setRoundIndex] = useState(0)
   const [totalEarned, setTotalEarned] = useState(0)
   const [statusText, setStatusText] = useState('')
+  const [milestoneMsg, setMilestoneMsg] = useState<string | null>(null)
 
   useEffect(() => {
     getCurrentUser().then((u) => {
@@ -96,6 +98,11 @@ export default function TournoiPage() {
         setTotalEarned((prev) => prev + bonus)
         playVictory()
         setPhase('champion')
+
+        const milestone = await tryClaimMilestone(user.id, 'first_tournament_champion', user.claimed_milestones ?? [])
+        if (milestone.unlocked) {
+          setMilestoneMsg(`🎁 Jalon débloqué : Premier tournoi remporté ! Carte Cadeau reçue — ${milestone.cardName}`)
+        }
       } else {
         playClick()
         setPhase('round_result')
@@ -117,6 +124,7 @@ export default function TournoiPage() {
     setRounds([])
     setRoundIndex(0)
     setTotalEarned(0)
+    setMilestoneMsg(null)
   }
 
   if (phase === 'loading' || !user || !userTeam) {
@@ -395,6 +403,7 @@ export default function TournoiPage() {
                 {phase === 'champion' ? '🏆 Champion du tournoi !' : phase === 'eliminated' ? '💀 Éliminé' : '✅ Qualifié pour le tour suivant'}
               </span>
               <div className="result-coins">+{totalEarned} ₱ gagnés dans ce tournoi</div>
+              {milestoneMsg && <div className="result-coins" style={{ color: '#f6c343', marginTop: 6 }}>{milestoneMsg}</div>}
             </div>
 
             <div className="tournoi-bracket-preview">
